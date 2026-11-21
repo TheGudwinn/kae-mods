@@ -1,9 +1,10 @@
 import { useSyncExternalStore } from "react";
+import defaultWall from "../assets/deadlock/default-wall.webp";
 
 /** What the user can change about how the launcher looks. Stored in localStorage, applied as attributes and CSS variables on <html>. */
 export type Appearance = {
   /** Launcher look: a set of design tokens (see themes.css). */
-  theme: "graphite" | "glass";
+  theme: "graphite" | "glass" | "deadlock";
   motion: "full" | "calm" | "off";
   density: "compact" | "normal" | "roomy";
   /** How much the picture behind the interface is darkened, 0-90, and blurred, 0-24 px. */
@@ -113,6 +114,13 @@ export function useWallpaper(): string | null {
     },
     () => wall,
   );
+}
+
+/** The picture the player chose, or the look's own picture (Deadlock has one) when nothing is chosen. */
+export function useEffectiveWallpaper(): string | null {
+  const own = useWallpaper();
+  const a = useAppearance();
+  return own ?? (a.theme === "deadlock" ? defaultWall : null);
 }
 
 export function useAppearance(): Appearance {

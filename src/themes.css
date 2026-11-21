@@ -61,3 +61,357 @@
 :root[data-theme="glass"] .rack-row:hover {
   background: var(--glass-hi);
 }
+
+/*
+  ---------- deadlock: the print language of the game ----------
+  Taken from the Deadlock UI and its poster sites: near-black green ground (#10130d), cream ink (#f7e9d5),
+  the lane colours (blue #60cde3, green #97da79, yellow #ffe14d) and the one orange (#dd6638) that marks "new"
+  and "play"; the item families spirit / weapon / vitality as the colours of badges. Valve faces: Pulp for
+  titles and stickers, Oracle for text. Shapes are flat and hard: small radii, offset print shadows, tilted
+  sticker tags, dashed route lines instead of hairlines.
+*/
+@font-face {
+  font-family: "VALVEOracle";
+  src: url("./assets/deadlock/fonts/oracle-500.woff2") format("woff2");
+  font-weight: 400 500;
+  font-display: swap;
+}
+@font-face {
+  font-family: "VALVEOracle";
+  src: url("./assets/deadlock/fonts/oracle-600.woff2") format("woff2");
+  font-weight: 600 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "VALVEPulp";
+  src: url("./assets/deadlock/fonts/pulp-700.woff2") format("woff2");
+  font-weight: 400 800;
+  font-display: swap;
+}
+
+:root[data-theme="deadlock"] {
+  --ink-0: #0d100e;
+  --ink-1: #131716;
+  --ink-2: #1b2120;
+  --frame: #10130d;
+  --glass: #161c1b;
+  --glass-hi: #1f2827;
+  --edge: rgb(247 233 213 / 0.14);
+  --edge-hi: rgb(247 233 213 / 0.34);
+  --text: #f7e9d5;
+  --muted: #bcb3a3;
+  --dim: #8d887c;
+  --accent: #ffe14d;
+  --accent-deep: #e0bf2c;
+  --brass: #ffe14d;
+  --on-brass: #121d22;
+  --white: #f7e9d5;
+  --on-white: #121d22;
+  --ok: #97da79;
+  --star: #ffe14d;
+  --warn: #ffe14d;
+  --danger: #ee5945;
+  --hot: #dd6638;
+  --ink: #121d22;
+  --paper: #d4bba4;
+  --print: 4px 4px 0 rgb(0 0 0 / 0.32);
+  --print-lg: 8px 8px 0 rgb(0 0 0 / 0.34);
+  --shell-art:
+    radial-gradient(900px 520px at 50% 118%, rgb(221 102 56 / 0.1), transparent 70%),
+    url("./assets/deadlock/collage.webp") center / cover no-repeat,
+    #10130d;
+  --r-frame: 8px;
+  --r-card: 6px;
+  --r-field: 4px;
+  --pill: 999px;
+  --font-title: "VALVEPulp", "Impact", system-ui, sans-serif;
+  --font-display: "VALVEPulp", "Impact", system-ui, sans-serif;
+  --font-body: "VALVEOracle", system-ui, sans-serif;
+  --title-weight: 700;
+}
+
+/* type: Pulp is a heavy display face, so titles are set tighter and a size down from the serif of the other looks */
+:root[data-theme="deadlock"] body {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+:root[data-theme="deadlock"] .view-title {
+  font-size: 38px;
+  line-height: 1.05;
+  color: var(--text);
+  text-shadow: 3px 3px 0 rgb(0 0 0 / 0.5);
+}
+:root[data-theme="deadlock"] .block-title,
+:root[data-theme="deadlock"] .modal-head h2,
+:root[data-theme="deadlock"] .confirm h2,
+:root[data-theme="deadlock"] .pick-title,
+:root[data-theme="deadlock"] .drawer h2 {
+  font-family: var(--font-title);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+}
+:root[data-theme="deadlock"] .view-sub,
+:root[data-theme="deadlock"] .note {
+  color: var(--muted);
+}
+
+/* surfaces: flat panels with a hard offset shadow, like a print lifted off the table */
+:root[data-theme="deadlock"] .shell > .rail {
+  background: var(--ink-1);
+  border-right: 2px dashed rgb(247 233 213 / 0.16);
+}
+:root[data-theme="deadlock"] .block,
+:root[data-theme="deadlock"] .notice,
+:root[data-theme="deadlock"] .rack,
+:root[data-theme="deadlock"] .collection,
+:root[data-theme="deadlock"] .tile,
+:root[data-theme="deadlock"] .card {
+  border: 2px solid var(--edge);
+  border-radius: var(--r-card);
+  background: var(--glass);
+  box-shadow: var(--print);
+}
+:root[data-theme="deadlock"] .rack-row {
+  border-radius: var(--r-field);
+}
+:root[data-theme="deadlock"] .field,
+:root[data-theme="deadlock"] .select-btn {
+  border: 2px solid var(--edge);
+  border-radius: var(--r-field);
+  background: var(--ink-0);
+}
+:root[data-theme="deadlock"] .field:focus-visible {
+  border-color: var(--accent);
+  outline: none;
+}
+:root[data-theme="deadlock"] .tabs {
+  border-bottom: 2px dashed rgb(247 233 213 / 0.18);
+}
+:root[data-theme="deadlock"] .tab {
+  font-family: var(--font-title);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+}
+:root[data-theme="deadlock"] .tab-on {
+  border-bottom-color: var(--hot);
+  color: var(--text);
+}
+
+/* buttons: the pill with a thick dark outline from the posters. Cyan is the action, orange is Play. */
+:root[data-theme="deadlock"] .btn {
+  border: 2px solid rgb(247 233 213 / 0.28);
+  border-radius: var(--pill);
+  background: var(--ink-2);
+  color: var(--text);
+  font-weight: 600;
+}
+:root[data-theme="deadlock"] .btn:hover:not(:disabled) {
+  border-color: var(--text);
+  background: var(--glass-hi);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 0.4);
+}
+:root[data-theme="deadlock"] .btn:active:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: none;
+}
+:root[data-theme="deadlock"] .btn-primary,
+:root[data-theme="deadlock"] .btn-play {
+  border: 3px solid #0a0c0b;
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 0.38);
+}
+:root[data-theme="deadlock"] .btn-primary {
+  background: var(--accent);
+}
+:root[data-theme="deadlock"] .btn-play {
+  background: var(--hot);
+}
+:root[data-theme="deadlock"] .btn-primary:hover:not(:disabled),
+:root[data-theme="deadlock"] .btn-play:hover:not(:disabled) {
+  border-color: #0a0c0b;
+  filter: brightness(1.08);
+  box-shadow: 5px 5px 0 rgb(0 0 0 / 0.42);
+}
+:root[data-theme="deadlock"] .btn-quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+}
+:root[data-theme="deadlock"] .btn:disabled {
+  opacity: 0.45;
+}
+
+/* badges: solid stickers a little off the level, coloured by the item families of the game */
+:root[data-theme="deadlock"] .tag,
+:root[data-theme="deadlock"] .flag {
+  height: 22px;
+  padding: 0 9px;
+  clip-path: none;
+  border-radius: 2px;
+  background: rgb(var(--tag-rgb));
+  color: var(--ink);
+  font: 700 11.5px/1 var(--font-title);
+  letter-spacing: 0.04em;
+  transform: rotate(-1.5deg);
+  box-shadow: 2px 2px 0 rgb(0 0 0 / 0.32);
+}
+:root[data-theme="deadlock"] .tag::before {
+  display: none;
+}
+:root[data-theme="deadlock"] .tag-models {
+  --tag-rgb: 236 151 25;
+}
+:root[data-theme="deadlock"] .tag-textures {
+  --tag-rgb: 151 218 121;
+}
+:root[data-theme="deadlock"] .tag-sounds {
+  --tag-rgb: 255 225 77;
+}
+:root[data-theme="deadlock"] .tag-interface {
+  --tag-rgb: 243 240 231;
+}
+:root[data-theme="deadlock"] .tag-effects {
+  --tag-rgb: 206 144 255;
+}
+:root[data-theme="deadlock"] .tag-maps,
+:root[data-theme="deadlock"] .tag-scripts {
+  --tag-rgb: 112 248 193;
+}
+:root[data-theme="deadlock"] .tag-hero {
+  --tag-rgb: 247 233 213;
+  background: rgb(247 233 213);
+  color: var(--ink);
+}
+:root[data-theme="deadlock"] .flag-update,
+:root[data-theme="deadlock"] .flag-cam-needs {
+  --tag-rgb: 221 102 56;
+}
+:root[data-theme="deadlock"] .flag-cam-fixed,
+:root[data-theme="deadlock"] .flag-ok {
+  --tag-rgb: 151 218 121;
+}
+:root[data-theme="deadlock"] .flag-link:hover {
+  background: rgb(var(--tag-rgb));
+  filter: brightness(1.1);
+}
+
+/* the rail: the mark of the game instead of the K, an orange tab on the current page */
+:root[data-theme="deadlock"] .rail-logo img {
+  content: url("./assets/deadlock/mark.webp");
+}
+:root[data-theme="deadlock"] .rail-item[aria-current="page"]::before {
+  background: var(--hot);
+  border-radius: 0 2px 2px 0;
+}
+:root[data-theme="deadlock"] .rail-badge {
+  background: var(--hot);
+  color: var(--ink);
+  font-family: var(--font-title);
+  border-radius: 2px;
+  transform: rotate(-3deg);
+}
+
+/* dialogs and tooltips */
+:root[data-theme="deadlock"] .scrim {
+  background: rgb(6 8 7 / 0.8);
+  backdrop-filter: none;
+}
+:root[data-theme="deadlock"] .modal,
+:root[data-theme="deadlock"] .confirm,
+:root[data-theme="deadlock"] .pick,
+:root[data-theme="deadlock"] .drawer {
+  border: 2px solid var(--edge-hi);
+  border-radius: var(--r-frame);
+  background: var(--ink-1);
+  box-shadow: var(--print-lg);
+}
+:root[data-theme="deadlock"] .modal-media {
+  background: var(--ink-0);
+}
+:root[data-theme="deadlock"] .files .file {
+  background: var(--ink-2);
+  border: 2px solid var(--edge);
+}
+:root[data-theme="deadlock"] .select-menu {
+  border: 2px solid var(--edge-hi);
+  border-radius: var(--r-field);
+  background: var(--ink-1);
+  box-shadow: var(--print);
+}
+/* the tooltip is a paper note, like the tooltips in the game */
+:root[data-theme="deadlock"] .tip {
+  border: 0;
+  border-radius: 2px;
+  background: var(--paper) url("./assets/deadlock/paper.webp") center / cover;
+  color: #1a1614;
+  font-weight: 600;
+  box-shadow: 4px 4px 0 rgb(0 0 0 / 0.38);
+  transform: rotate(-1deg);
+}
+
+/* the 3D preview: abilities as round discs with the number under them, as on the hero pages */
+:root[data-theme="deadlock"] .vw-pill,
+:root[data-theme="deadlock"] .vw-tag,
+:root[data-theme="deadlock"] .vw-side,
+:root[data-theme="deadlock"] .vw-anim,
+:root[data-theme="deadlock"] .vw-slots {
+  background: rgb(13 16 14 / 0.82);
+  border: 2px solid var(--edge);
+}
+:root[data-theme="deadlock"] .vw-pill {
+  font-family: var(--font-title);
+}
+:root[data-theme="deadlock"] .vw-slot-box {
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: #2b2810;
+  color: var(--accent);
+  font-family: var(--font-title);
+}
+:root[data-theme="deadlock"] .vw-slot[aria-pressed="true"] .vw-slot-box {
+  border-color: var(--hot);
+  background: #4a2414;
+  color: var(--hot);
+}
+:root[data-theme="deadlock"] .vw-slot-n {
+  left: 50%;
+  top: auto;
+  bottom: 2px;
+  transform: translateX(-50%);
+  font-family: var(--font-title);
+}
+:root[data-theme="deadlock"] .vw-pop {
+  border: 2px solid var(--edge-hi);
+  box-shadow: var(--print);
+}
+
+/* filter chips and info chips: square-cornered tickets with a printed edge */
+:root[data-theme="deadlock"] .chip {
+  border: 2px solid var(--edge);
+  border-radius: 3px;
+  background: var(--ink-2);
+  font-weight: 600;
+}
+:root[data-theme="deadlock"] .chip[aria-pressed="true"],
+:root[data-theme="deadlock"] .chip.is-on {
+  border-color: var(--accent);
+  background: rgb(255 225 77 / 0.14);
+  color: var(--accent);
+}
+
+/* the preview controls and switches were blue in the base look; here they follow the accent */
+:root[data-theme="deadlock"] .vw-ico[aria-pressed="true"] {
+  background: rgb(255 225 77 / 0.14);
+}
+:root[data-theme="deadlock"] .vw-switch:checked {
+  background: rgb(255 225 77 / 0.25);
+  border-color: var(--accent);
+}
+:root[data-theme="deadlock"] .vw-seg[aria-checked="true"] {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}

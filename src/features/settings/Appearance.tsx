@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { useRef, useState } from "react";
-import { clearWallpaper, pickWallpaper, resetAppearance, setAppearance, useAppearance, useWallpaper, type Appearance as Look } from "../../lib/appearance";
+import { clearWallpaper, pickWallpaper, resetAppearance, setAppearance, useAppearance, useEffectiveWallpaper, useWallpaper, type Appearance as Look } from "../../lib/appearance";
 
 /** A row of mutually exclusive choices, shown as a segmented control. */
 function Seg<K extends string>({ label, value, options, onChange }: { label: string; value: K; options: { value: K; label: string }[]; onChange: (v: K) => void }) {
@@ -32,7 +32,8 @@ export default function Appearance() {
   const { t } = useTranslation();
   const a = useAppearance();
   const o = <K extends keyof Look>(_key: K, values: Look[K][], tkey: string) => values.map((v) => ({ value: v, label: t(`appearance.${tkey}.${String(v)}`) }));
-  const wall = useWallpaper();
+  const own = useWallpaper();
+  const wall = useEffectiveWallpaper();
   const file = useRef<HTMLInputElement>(null);
   const [wallErr, setWallErr] = useState(false);
   const choose = async (f?: File) => {
@@ -52,16 +53,16 @@ export default function Appearance() {
       <p className="note">{t("appearance.hint")}</p>
 
       <Row title={t("appearance.theme")} hint={t("appearance.themeHint")}>
-        <Seg label={t("appearance.theme")} value={a.theme} options={o("theme", ["graphite", "glass"], "themes")} onChange={(v) => setAppearance({ theme: v })} />
+        <Seg label={t("appearance.theme")} value={a.theme} options={o("theme", ["graphite", "glass", "deadlock"], "themes")} onChange={(v) => setAppearance({ theme: v })} />
       </Row>
 
       <Row title={t("appearance.wall")} hint={wallErr ? t("appearance.wallErr") : t("appearance.wallHint")}>
         {wall && <img className="wall-thumb" src={wall} alt="" />}
         <input ref={file} type="file" accept="image/*" hidden onChange={(e) => { void choose(e.target.files?.[0]); e.target.value = ""; }} />
         <button className="btn" type="button" onClick={() => file.current?.click()}>
-          {wall ? t("appearance.wallChange") : t("appearance.wallPick")}
+          {own ? t("appearance.wallChange") : t("appearance.wallPick")}
         </button>
-        {wall && (
+        {own && (
           <button className="btn btn-ghost" type="button" onClick={clearWallpaper}>
             {t("appearance.wallRemove")}
           </button>

@@ -35,7 +35,7 @@ import Icon from "./components/Icons";
 import Select from "./components/Select";
 import Confirm, { type ConfirmState } from "./components/Confirm";
 import History, { type HistoryItem } from "./components/History";
-import { setAppearance, useAppearance, useWallpaper } from "./lib/appearance";
+import { setAppearance, useAppearance, useEffectiveWallpaper } from "./lib/appearance";
 import Home from "./features/home/Home";
 import logo from "./assets/logo.svg";
 import Catalog from "./features/store/Catalog";
@@ -53,7 +53,7 @@ type View = "home" | "catalog" | "library" | "profiles" | "downloads" | "perform
 export default function App() {
   const { t } = useTranslation();
   const look = useAppearance();
-  const wallpaper = useWallpaper();
+  const wallpaper = useEffectiveWallpaper();
   const [view, setViewRaw] = useState<View>("home");
   const viewRef = useRef(view);
   viewRef.current = view;

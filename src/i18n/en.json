@@ -777,7 +777,8 @@
     "themeHint": "A set of colours and shapes. Glass looks best with a background picture.",
     "themes": {
       "graphite": "Graphite",
-      "glass": "Glass"
+      "glass": "Glass",
+      "deadlock": "Deadlock"
     }
   },
   "confirm": {
