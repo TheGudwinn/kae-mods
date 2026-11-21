@@ -1,6 +1,8 @@
 //! Tauri commands. Thin wrappers: all logic lives in the library modules.
 mod abilities;
 mod capture;
+mod hero_art;
+mod posters;
 mod content;
 mod game;
 mod hero;
@@ -13,6 +15,8 @@ mod updates;
 
 pub use abilities::*;
 pub use capture::*;
+pub use hero_art::*;
+pub use posters::*;
 pub use content::*;
 pub use game::*;
 pub use hero::*;
@@ -139,7 +143,7 @@ pub async fn hero_portraits(state: State<'_, AppState>) -> Result<std::collectio
 }
 
 /// "The Doorman" and "Doorman" are the same hero; punctuation and case do not matter.
-fn hero_key(name: &str) -> String {
+pub(crate) fn hero_key(name: &str) -> String {
     let l = name.to_lowercase();
     l.strip_prefix("the ").unwrap_or(&l).chars().filter(|c| c.is_alphanumeric()).collect()
 }

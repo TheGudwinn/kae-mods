@@ -32,7 +32,7 @@ export function parseCollections(raw: string): Collection[] {
     const name = text(o.name, 80);
     const id = text(o.id, 64);
     const code = text(o.code, 400_000);
-    if (!name || !id || !code.startsWith("kea1:")) return [];
+    if (!name || !id || !/^ka[ea]1:/.test(code)) return [];
     return [{ id, name, author: text(o.author, 40), description: text(o.description, 300), code }];
   });
 }

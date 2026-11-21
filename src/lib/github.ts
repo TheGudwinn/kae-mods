@@ -1,6 +1,6 @@
 import { openExternal } from "./open";
 
-export const REPO = "TheGudwinn/kea-mods";
+export const REPO = "TheGudwinn/kae-mods";
 const ISSUE_LIMIT = 6000; // longer addresses are cut by browsers and servers
 
 /** Opens a new issue of the project's repository with the text filled in. Returns false when the text was too long to carry in the address. */

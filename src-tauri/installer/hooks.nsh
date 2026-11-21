@@ -1,4 +1,4 @@
-; Branding for the Kea Mods installer.
+; Branding for the Kae Mods installer.
 ; The Tauri NSIS template includes this file BEFORE it declares the MUI pages, so these defines apply to them.
 ; (Hooks such as NSIS_HOOK_POSTINSTALL could be added here later; none are needed now.)
 

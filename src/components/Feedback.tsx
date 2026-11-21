@@ -27,7 +27,7 @@ export default function Feedback({ build, onClose }: { build: string | null; onC
   }, [onClose]);
 
   const send = async () => {
-    const info = withInfo ? `\n\n---\nKea Mods ${version}${build ? ` · game build ${build}` : ""}` : "";
+    const info = withInfo ? `\n\n---\nKae Mods ${version}${build ? ` · game build ${build}` : ""}` : "";
     const fits = await openIssue(`[${t(`feedback.kind_${kind}`)}] ${text.trim().slice(0, 60)}`, `${text.trim()}${info}`);
     setNote(fits ? t("feedback.opened") : t("feedback.tooLong"));
   };

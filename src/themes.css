@@ -300,10 +300,7 @@
   filter: brightness(1.1);
 }
 
-/* the rail: the mark of the game instead of the K, an orange tab on the current page */
-:root[data-theme="deadlock"] .rail-logo img {
-  content: url("./assets/deadlock/mark.webp");
-}
+/* the rail: an orange tab on the current page */
 :root[data-theme="deadlock"] .rail-item[aria-current="page"]::before {
   background: var(--hot);
   border-radius: 0 2px 2px 0;
@@ -414,4 +411,197 @@
 }
 :root[data-theme="deadlock"] .vw-seg[aria-checked="true"] {
   box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* ---------- the heroes page as a poster ----------
+   After the fan poster layout: a thin orange frame with the hero breaking out of it, the name set vertically in
+   striped orange, bracketed captions and wide justified small caps. The first rule is for the other looks. */
+.hero-poster {
+  display: none;
+}
+:root[data-theme="deadlock"] .skins-head {
+  display: none;
+}
+:root[data-theme="deadlock"] .hero-poster {
+  --hero: #dd6638;
+  position: relative;
+  display: grid;
+  grid-template-columns: clamp(64px, 20cqi, 104px) minmax(0, 1fr);
+  grid-template-rows: auto minmax(220px, 1fr) auto auto;
+  column-gap: 14px;
+  container-type: inline-size;
+  min-height: 440px;
+  padding: 16px 18px 14px 14px;
+  overflow: hidden;
+  isolation: isolate;
+  border: 2px solid var(--edge-hi);
+  border-radius: var(--r-frame);
+  background: #0b0d0c;
+  box-shadow: var(--print);
+}
+/* printed grain over the black */
+:root[data-theme="deadlock"] .hero-poster::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background: url("./assets/deadlock/speckle.webp") 0 0 / 900px auto;
+  opacity: 0.35;
+  pointer-events: none;
+}
+:root[data-theme="deadlock"] .hero-poster-body {
+  display: contents;
+}
+/* the vertical name: stripes instead of a solid fill, as on the poster */
+:root[data-theme="deadlock"] .hero-poster-name {
+  grid-column: 1;
+  grid-row: 1 / 4;
+  z-index: 1;
+  align-self: end;
+  justify-self: center;
+  max-height: 100%;
+  margin: 0;
+  font: 400 min(86px, calc(470px / var(--n, 6))) / 0.95 var(--font-title);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  background: repeating-linear-gradient(0deg, var(--hot) 0 3px, transparent 3px 6px);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 1.6px var(--hot);
+  white-space: nowrap;
+}
+/* the frame with the hero art; the cut-out stands in front of it and breaks the top edge */
+:root[data-theme="deadlock"] .hero-poster-bg {
+  grid-column: 2;
+  grid-row: 2;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  object-fit: cover;
+  object-position: 40% 50%;
+  border: 1.5px solid var(--hot);
+  background: #12231f;
+}
+:root[data-theme="deadlock"] .hero-poster-cut {
+  grid-column: 2;
+  grid-row: 2;
+  z-index: 2;
+  align-self: end;
+  justify-self: start;
+  height: calc(100% + 44px);
+  margin: 0 0 -2px 4%;
+  object-fit: contain;
+  object-position: left bottom;
+  filter: drop-shadow(6px 6px 0 rgb(0 0 0 / 0.4));
+  pointer-events: none;
+  user-select: none;
+}
+/* the role: a bracketed line of small print above the frame */
+:root[data-theme="deadlock"] .hero-poster-role {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1;
+  z-index: 1;
+  align-self: start;
+  justify-self: stretch;
+  margin: 0 0 12px;
+  padding: 5px 14px;
+  color: var(--text);
+  font: 600 11px/1.4 var(--font-body);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: justify;
+  text-align-last: justify;
+}
+:root[data-theme="deadlock"] .hero-poster-role::before,
+:root[data-theme="deadlock"] .hero-poster-role::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  border: 1.5px solid var(--text);
+}
+:root[data-theme="deadlock"] .hero-poster-role::before {
+  left: 0;
+  border-right: 0;
+}
+:root[data-theme="deadlock"] .hero-poster-role::after {
+  right: 0;
+  border-left: 0;
+}
+/* stickers over the lower right corner of the frame, in the colour of the hero */
+:root[data-theme="deadlock"] .hero-poster-tags {
+  grid-column: 2;
+  grid-row: 2;
+  z-index: 3;
+  align-self: end;
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 0 10px 12px 0;
+}
+:root[data-theme="deadlock"] .hero-sticker {
+  padding: 5px 11px 4px;
+  border-radius: 2px;
+  background: var(--hero);
+  color: #0b0e0d;
+  font: 700 12.5px/1 var(--font-title);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 3px 3px 0 rgb(0 0 0 / 0.4);
+}
+:root[data-theme="deadlock"] .hero-sticker:nth-child(odd) {
+  transform: rotate(-2deg);
+}
+:root[data-theme="deadlock"] .hero-sticker:nth-child(even) {
+  transform: rotate(1.5deg);
+}
+/* the lore: justified small caps under the frame, like the ability text on the poster */
+:root[data-theme="deadlock"] .hero-poster-lore {
+  grid-column: 2;
+  grid-row: 3;
+  z-index: 1;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 12px 0 0;
+  color: rgb(247 233 213 / 0.9);
+  font: 600 11.5px/1.5 var(--font-body);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: justify;
+}
+:root[data-theme="deadlock"] .hero-poster-wear {
+  grid-column: 1 / -1;
+  grid-row: 4;
+  z-index: 1;
+  margin: 12px 0 0;
+  padding-top: 8px;
+  border-top: 2px dashed var(--edge);
+  color: var(--muted);
+  font-size: 13px;
+}
+:root[data-theme="deadlock"] .hero-poster-wear b {
+  color: var(--text);
+}
+
+/* printed grain over the whole window, as on the posters */
+:root[data-theme="deadlock"] .grain {
+  display: block;
+  position: absolute;
+  z-index: 15;
+  inset: 0;
+  background: url("./assets/deadlock/grain.webp") 0 0 / 384px 384px;
+  opacity: 0.36;
+  pointer-events: none;
+  /* kept out of the cross-fade between views, which would average two noises into a smooth image */
+  view-transition-name: grain;
 }

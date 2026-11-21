@@ -20,6 +20,32 @@ type Props = {
   onFind: (text: string) => void;
 };
 
+/** A hero picture fetched through the app (shrunk and kept on disk), shown once it has arrived. */
+function ArtImage({ url, className }: { url: string; className: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let stale = false;
+    let made: string | null = null;
+    call<ArrayBuffer | number[]>("hero_art", { url, width: 960 }).then(
+      (raw) => {
+        if (stale) return;
+        made = URL.createObjectURL(new Blob([raw instanceof ArrayBuffer ? raw : new Uint8Array(raw)], { type: "image/jpeg" }));
+        setSrc(made);
+      },
+      () => {},
+    );
+    return () => {
+      stale = true;
+      if (made) URL.revokeObjectURL(made);
+    };
+  }, [url]);
+  return src ? <img className={className} src={src} alt="" draggable={false} /> : <span className={className} aria-hidden="true" />;
+}
+
+/** Poster material of a hero (see the `hero_posters` command). */
+type Poster = { name: string; tags: string[]; role: string; lore: string; color: string | null; background: string | null; cutout: string | null };
+const heroKey = (name: string) => name.toLowerCase().replace(/^the /, "").replace(/[^\p{L}\p{N}]/gu, "");
+
 type Skin = {
   key: string;
   title: string;
@@ -41,7 +67,18 @@ const slotOf = (name: string) => {
 const plain = (n: string) => n.replace(/\.disabled$/i, "");
 
 export default function Skins({ mods, groups, known, contents, gameFound, onToggle, onToggleForeign, onGoCatalog, onFind }: Props) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [posters, setPosters] = useState<Record<string, Poster>>({});
+  useEffect(() => {
+    let stale = false;
+    call<Record<string, Poster>>("hero_posters", { lang: i18n.language.startsWith("ru") ? "russian" : "english" }).then(
+      (r) => !stale && setPosters(r ?? {}),
+      () => {},
+    );
+    return () => {
+      stale = true;
+    };
+  }, [i18n.language]);
   // hero portraits for the list (a hero without one just shows the name)
   const [portraits, setPortraits] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -140,6 +177,32 @@ export default function Skins({ mods, groups, known, contents, gameFound, onTogg
         <section className="skins-center">
           {hero && (
             <>
+              {(() => {
+                const poster = posters[heroKey(hero.name)];
+                return (
+                  <header className="hero-poster" style={{ ...(poster?.color ? { "--hero": poster.color } : {}), "--n": Math.max(4, (poster?.name ?? hero.name).length) } as React.CSSProperties}>
+                    {poster?.background && <ArtImage key={poster.background} className="hero-poster-bg" url={poster.background} />}
+                    {poster?.cutout && <img key={poster.cutout} className="hero-poster-cut" src={poster.cutout} alt="" decoding="async" draggable={false} />}
+                    <div className="hero-poster-body">
+                      {poster?.role && <span className="hero-poster-role">{poster.role}</span>}
+                      <h2 className="hero-poster-name">{poster?.name ?? hero.name}</h2>
+                      {poster && poster.tags.length > 0 && (
+                        <div className="hero-poster-tags">
+                          {poster.tags.map((x) => (
+                            <span key={x} className="hero-sticker">
+                              {x}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {poster?.lore && <p className="hero-poster-lore">{poster.lore}</p>}
+                      <p className="hero-poster-wear">
+                        {t("skins.wearing")}: <b>{wearing ? wearing.title : t("skins.default")}</b> · {t("skins.count", { count: skins.length })}
+                      </p>
+                    </div>
+                  </header>
+                );
+              })()}
               <div className="block skins-head">
                 <h2 className="block-title">{hero.name}</h2>
                 <p className="note">

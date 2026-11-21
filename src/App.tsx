@@ -35,7 +35,7 @@ import Icon from "./components/Icons";
 import Select from "./components/Select";
 import Confirm, { type ConfirmState } from "./components/Confirm";
 import History, { type HistoryItem } from "./components/History";
-import { setAppearance, useAppearance, useEffectiveWallpaper } from "./lib/appearance";
+import { setAppearance, useAppearance, useEffectiveWallpaper, useWallpaper, wallVideo } from "./lib/appearance";
 import Home from "./features/home/Home";
 import logo from "./assets/logo.svg";
 import Catalog from "./features/store/Catalog";
@@ -54,6 +54,7 @@ export default function App() {
   const { t } = useTranslation();
   const look = useAppearance();
   const wallpaper = useEffectiveWallpaper();
+  const ownWallpaper = useWallpaper();
   const [view, setViewRaw] = useState<View>("home");
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -625,7 +626,13 @@ export default function App() {
 
   return (
     <div className={`shell ${maximized ? "maximized" : ""}`}>
-      {wallpaper && <div className="wallpaper" aria-hidden="true" style={{ backgroundImage: `url(${wallpaper})` }} />}
+      {wallpaper && (
+        <div className="wallpaper" aria-hidden="true" style={{ backgroundImage: `url(${wallpaper})` }}>
+          {/* the shipped animated background, unless the player chose a picture or turned motion off */}
+          {wallVideo && !ownWallpaper && look.motion !== "off" && <video className="wallpaper-video" src={wallVideo} poster={wallpaper} autoPlay loop muted playsInline preload="auto" />}
+        </div>
+      )}
+      <div className="grain" aria-hidden="true" />
       <nav ref={railRef} className={`rail ${look.rail === "open" ? "rail-open" : "rail-closed"}`} aria-label={t("app.name")}>
         <span className={`rail-ind ${indReady ? "rail-ind-ready" : ""}`} aria-hidden="true" style={ind ? { transform: `translateY(${ind.y}px)`, height: ind.h, opacity: 1 } : { opacity: 0 }} />
         <div className="rail-logo" data-tauri-drag-region title={t("app.name")}>

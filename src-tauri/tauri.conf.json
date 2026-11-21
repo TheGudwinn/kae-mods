@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Kea Mods",
+  "productName": "Kae Mods",
   "version": "0.1.4",
   "identifier": "ru.guddion.deadlockmm",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Kea Mods",
+        "title": "Kae Mods",
         "width": 1494,
         "height": 884,
         "dragDropEnabled": false,
@@ -62,14 +62,14 @@
         ]
       }
     },
-    "publisher": "Kea Mods",
-    "copyright": "Kea Mods"
+    "publisher": "Kae Mods",
+    "copyright": "Kae Mods"
   },
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDYyMUVBMDA4MTM3N0QxREEKUldUYTBYY1RDS0FlWWoyNU9MMlFGL0RQeENOYnJ0cXJ5dlExL0xvTkw4TUVPMW1yemxmdXE3dk0K",
       "endpoints": [
-        "https://github.com/TheGudwinn/kea-mods/releases/latest/download/latest.json"
+        "https://github.com/TheGudwinn/kae-mods/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

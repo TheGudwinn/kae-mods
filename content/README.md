@@ -1,7 +1,7 @@
 Content for the app
 ===================
 
-Kea Mods reads two files from this folder (from the `main` branch) and shows them inside the app.
+Kae Mods reads two files from this folder (from the `main` branch) and shows them inside the app.
 Both are lists. Empty lists are fine: the app then shows a short "nothing here yet" note.
 
 `news.json`
@@ -34,7 +34,7 @@ A collection is a profile code (Profiles page, "Copy code") with a name and a fe
     "name": "Minimal FPS drop",
     "author": "name",
     "description": "Small mods that do not touch heroes.",
-    "code": "kea1:..."
+    "code": "kae1:..."
   }
 ]
 ```

@@ -3,7 +3,7 @@ use super::{err, AppState};
 use tauri::State;
 
 /// Where the files live. Only these two names can be asked for, nothing the UI sends becomes part of the URL.
-const BASE: &str = "https://raw.githubusercontent.com/TheGudwinn/kea-mods/main/content";
+const BASE: &str = "https://raw.githubusercontent.com/TheGudwinn/kae-mods/main/content";
 const MAX_BYTES: usize = 256 * 1024;
 
 fn file_for(kind: &str) -> Option<&'static str> {

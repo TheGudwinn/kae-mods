@@ -1,15 +1,14 @@
-Kea Mods
-========
+<p align="center"><img src="src/assets/logo-full.svg" alt="Kae Mods" width="320"></p>
 
-[![Release](https://img.shields.io/github/v/release/TheGudwinn/kea-mods)](https://github.com/TheGudwinn/kea-mods/releases)
-[![Issues](https://img.shields.io/github/issues/TheGudwinn/kea-mods)](https://github.com/TheGudwinn/kea-mods/issues)
-[![License](https://img.shields.io/github/license/TheGudwinn/kea-mods)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/TheGudwinn/kae-mods)](https://github.com/TheGudwinn/kae-mods/releases)
+[![Issues](https://img.shields.io/github/issues/TheGudwinn/kae-mods)](https://github.com/TheGudwinn/kae-mods/issues)
+[![License](https://img.shields.io/github/license/TheGudwinn/kae-mods)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Built%20with-Tauri-24C8DB)](https://tauri.app)
 
 A mod manager for the Valve game Deadlock, built with Tauri, Rust, React and TypeScript.
 Installs mods from GameBanana, manages their load order and updates, and works through proxies and mirrors on unreliable networks.
 
-[Download](https://github.com/TheGudwinn/kea-mods/releases) | [Report a bug](https://github.com/TheGudwinn/kea-mods/issues) | [Request a feature](https://github.com/TheGudwinn/kea-mods/issues)
+[Download](https://github.com/TheGudwinn/kae-mods/releases) | [Report a bug](https://github.com/TheGudwinn/kae-mods/issues) | [Request a feature](https://github.com/TheGudwinn/kae-mods/issues)
 
 Table of Contents
 -----------------
@@ -33,7 +32,7 @@ Features
 - **Updates**: in-app, single or bulk, including mods installed by other managers.
 - **Camera check**: verifies hero cameras in installed models, including zstd-compressed resources, and marks fixed mods.
 - **History**: installs and updates are listed on the Downloads page and kept between runs.
-- **Profiles**: mod sets with JSON export and import, plus a one-line share code (`kea1:...`) to paste into a chat.
+- **Profiles**: mod sets with JSON export and import, plus a one-line share code (`kae1:...`) to paste into a chat.
 - **After a game patch**: mods installed on an older game build are listed with a risk level (hero models, effects and scripts break most often). Check for updates or switch the risky ones off in one click.
 - **Find the broken mod**: switches half of the mods off, you start the game and answer whether the problem is still there; a few steps find the cause. Everything can be put back as it was.
 - **Look inside before installing**: the mod page can show what a file changes (models, textures, sounds, heroes) without installing it.
@@ -50,20 +49,20 @@ The only hosts the app talks to: `gamebanana.com` and `images.gamebanana.com` (c
 Installation
 ------------
 
-Windows 10 or 11 is required. Download the installer from the [Releases](https://github.com/TheGudwinn/kea-mods/releases) page and run it.
+Windows 10 or 11 is required. Download the installer from the [Releases](https://github.com/TheGudwinn/kae-mods/releases) page and run it.
 The installer bundles WebView2 and does not need an internet connection.
 
 Usage
 -----
 
-1. Start Kea Mods. It locates the Deadlock installation through Steam; the path can be set manually in Settings.
+1. Start Kae Mods. It locates the Deadlock installation through Steam; the path can be set manually in Settings.
 2. Open the catalog, pick a mod and press Install. Progress is shown in the left panel and on the Downloads page.
 3. Manage installed mods in the Library: toggle, reorder, update or remove them.
 
 Game integration
 ----------------
 
-- The game mounts only `pakNN_dir.vpk` files from `addons`. Kea Mods names its files accordingly and identifies its own files through its database.
+- The game mounts only `pakNN_dir.vpk` files from `addons`. Kae Mods names its files accordingly and identifies its own files through its database.
 - `gameinfo.gi` is modified minimally and backed up first. If missing, the `Mod citadel` and `Write citadel` entries are added.
 - All changes are journaled and can be undone.
 
@@ -73,8 +72,8 @@ Development
 Requirements: Node 24, pnpm, Rust (stable) and, on Windows, Visual Studio Build Tools with the C++ workload.
 
 ```bash
-git clone https://github.com/TheGudwinn/kea-mods.git
-cd kea-mods
+git clone https://github.com/TheGudwinn/kae-mods.git
+cd kae-mods
 pnpm install
 pnpm tauri dev       # application with hot reload
 pnpm build           # type check and build the interface
@@ -101,5 +100,5 @@ This project is not affiliated with Valve Corporation. Deadlock is a trademark o
 Contact
 -------
 
-- Repository: https://github.com/TheGudwinn/kea-mods
-- Issues: https://github.com/TheGudwinn/kea-mods/issues
+- Repository: https://github.com/TheGudwinn/kae-mods
+- Issues: https://github.com/TheGudwinn/kae-mods/issues

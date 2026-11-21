@@ -15,8 +15,8 @@ fn installer_signature_matches_the_public_key_in_the_config() {
     let pubkey = decode(conf["plugins"]["updater"]["pubkey"].as_str().unwrap());
     let version = conf["version"].as_str().unwrap();
     let dir = std::path::Path::new("target/release/bundle/nsis");
-    let exe = dir.join(format!("Kea Mods_{version}_x64-setup.exe"));
-    let sig = dir.join(format!("Kea Mods_{version}_x64-setup.exe.sig"));
+    let exe = dir.join(format!("Kae Mods_{version}_x64-setup.exe"));
+    let sig = dir.join(format!("Kae Mods_{version}_x64-setup.exe.sig"));
 
     let pk = PublicKey::decode(&pubkey).expect("public key in the config is valid");
     let signature = Signature::decode(&decode(&std::fs::read_to_string(sig).unwrap())).expect("signature file is valid");

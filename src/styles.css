@@ -5673,7 +5673,7 @@ details summary {
 }
 
 
-/* ---------- Kea: play block, diagnostics tabs, compact update notice ---------- */
+/* ---------- Kae: play block, diagnostics tabs, compact update notice ---------- */
 .playblock {
   display: flex;
   align-items: center;
@@ -6839,4 +6839,24 @@ details summary {
 }
 .vw-slot-name {
   text-transform: none;
+}
+
+/* the animated background fills the same layer as a still picture */
+.wallpaper-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.grain {
+  display: none;
+}
+::view-transition-group(grain),
+::view-transition-new(grain) {
+  animation: none;
+}
+::view-transition-old(grain) {
+  display: none;
 }

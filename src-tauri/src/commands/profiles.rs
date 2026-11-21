@@ -151,9 +151,11 @@ pub async fn export_profile(state: State<'_, AppState>, id: i64, path: String) -
 }
 
 /// Prefix of a profile share code, so a pasted code is recognised and a future format can be told apart.
-const CODE_PREFIX: &str = "kea1:";
+const CODE_PREFIX: &str = "kae1:";
+/// Codes made before the rename.
+const LEGACY_CODE_PREFIX: &str = "kea1:";
 
-/// The profile as one line of text (`kea1:` + base64url of the same JSON a profile file holds), to paste into a chat.
+/// The profile as one line of text (`kae1:` + base64url of the same JSON a profile file holds), to paste into a chat.
 #[tauri::command]
 pub async fn profile_code(state: State<'_, AppState>, id: i64) -> Result<String, String> {
     use base64::Engine;
@@ -168,7 +170,7 @@ pub async fn profile_code(state: State<'_, AppState>, id: i64) -> Result<String,
 #[tauri::command]
 pub async fn import_profile_code(state: State<'_, AppState>, code: String) -> Result<i64, String> {
     use base64::Engine;
-    let body = code.trim().strip_prefix(CODE_PREFIX).ok_or("not_a_profile:wrong code")?;
+    let body = code.trim().strip_prefix(CODE_PREFIX).or_else(|| code.trim().strip_prefix(LEGACY_CODE_PREFIX)).ok_or("not_a_profile:wrong code")?;
     if body.len() > profiles::MAX_FILE_BYTES * 2 {
         return Err("file_too_large".into());
     }

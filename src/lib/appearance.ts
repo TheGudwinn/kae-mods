@@ -116,11 +116,15 @@ export function useWallpaper(): string | null {
   );
 }
 
+/** The animated background shipped with the app: whatever file sits at src/assets/wall.mp4 or wall.webm (none yet). */
+const videos = import.meta.glob("../assets/wall.{mp4,webm}", { eager: true, query: "?url", import: "default" }) as Record<string, string>;
+export const wallVideo: string | null = Object.values(videos)[0] ?? null;
+
 /** The picture the player chose, or the look's own picture (Deadlock has one) when nothing is chosen. */
 export function useEffectiveWallpaper(): string | null {
   const own = useWallpaper();
   const a = useAppearance();
-  return own ?? (a.theme === "deadlock" ? defaultWall : null);
+  return own ?? (a.theme === "deadlock" || wallVideo ? defaultWall : null);
 }
 
 export function useAppearance(): Appearance {

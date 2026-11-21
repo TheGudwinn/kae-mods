@@ -1,1 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect x="4" y="4" width="56" height="56" rx="16" fill="#161920" stroke="#6CA8E0" stroke-width="3"/><path d="M23 18v28M23 33l16-15M27 30l14 16" stroke="#6CA8E0" stroke-width="5" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Kae Mods">
+  <rect width="128" height="128" rx="26" fill="#26241e"/>
+  <g fill="#f3eee4">
+    <rect x="22" y="21" width="20" height="87"/>
+    <path d="M41.9 62.8 99.1 107.9H72.8L41.9 76.3Z"/>
+    <path d="M57.7 49.4 82.3 21.1H106.4L70.8 57Z"/>
+  </g>
+</svg>

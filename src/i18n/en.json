@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Kea Mods",
+    "name": "Kae Mods",
     "sub": "Mod manager"
   },
   "nav": {
@@ -126,7 +126,7 @@
     "updateAvailable": "New version available{{version}}",
     "newerOnCatalog": "Update available",
     "newerOnCatalogHint": "The mod page changed {{modified}}, the file was installed {{installed}}. A newer version may be out; editing the description changes the date too, so this is only a hint.",
-    "updateForeignHint": "Downloads the new version and replaces the mod files. Kea Mods manages the mod from then on; the action can be undone.",
+    "updateForeignHint": "Downloads the new version and replaces the mod files. Kae Mods manages the mod from then on; the action can be undone.",
     "noUpdateFile": "The mod page has no file that can be installed.",
     "pickTitle": "Update \"{{name}}\"",
     "pickText": "The mod page has several files. Choose which one to install.",
@@ -274,7 +274,7 @@
   "profiles": {
     "copyCode": "Copy code",
     "codeCopied": "The code of \"{{name}}\" is copied. Send it to a friend, they paste it into the import field.",
-    "codePlaceholder": "Paste a build code (kea1:…)",
+    "codePlaceholder": "Paste a build code (kae1:…)",
     "codeImport": "Import code",
     "title": "Profiles",
     "subtitle": "A profile remembers which mods are enabled and in what order. Switching enables and disables installed mods in one action.",
@@ -548,7 +548,7 @@
     "tab_own": "Your settings",
     "current": "Applied now",
     "none": "Nothing applied",
-    "noneHint": "gameinfo.gi has no changes from Kea Mods",
+    "noneHint": "gameinfo.gi has no changes from Kae Mods",
     "unknownConfig": "Unknown config",
     "settingsApplied": "Settings changed: {{count}}",
     "turnOff": "Turn off",

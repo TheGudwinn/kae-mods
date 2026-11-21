@@ -110,6 +110,8 @@ pub fn run() {
             commands::save_capture,
             commands::hero_clips,
             commands::hero_abilities,
+            commands::hero_posters,
+            commands::hero_art,
             commands::repair_cameras,
             commands::apply_fix,
             commands::perf_state,
