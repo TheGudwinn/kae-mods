@@ -30,3 +30,7 @@ memory/
 updater.password
 .env
 .env.*
+
+# local notes and helpers
+docs/redesign/
+tools/hero-names.html
