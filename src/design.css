@@ -3359,3 +3359,41 @@ input.vw-switch[type="checkbox"]:checked::after {
   color: rgb(255 255 255 / 0.88);
   text-shadow: 0 1px 10px rgb(0 0 0 / 0.85);
 }
+
+/* ---------- toast: graphite floating pill, same family as the rest ---------- */
+.activity {
+  right: 24px;
+  bottom: 24px;
+  width: min(400px, calc(100vw - 48px));
+  padding: 18px 20px 18px 24px;
+  background: var(--ink-2);
+  border: 1px solid var(--edge-hi);
+  border-radius: 28px;
+  box-shadow: 0 18px 48px rgb(0 0 0 / 0.55);
+  color: var(--text);
+}
+.activity-ok {
+  border-color: color-mix(in srgb, var(--ok) 45%, transparent);
+}
+.activity-err {
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.activity-row {
+  align-items: center;
+  gap: 16px;
+}
+.activity .btn-quiet {
+  flex: none;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-3);
+  color: var(--text);
+}
+.activity .btn-quiet:hover {
+  background: rgb(255 255 255 / 0.16);
+}
+.bar {
+  background: var(--ink-3);
+}

@@ -69,7 +69,8 @@
     "started": "Launch request sent to Steam. Options: {{args}}",
     "startedPlain": "Launch request sent to Steam",
     "running": "Game is running",
-    "runningHint": "Deadlock is running. Mod changes apply on its next start.",
+    "runningHint": "Game is running",
+    "runningNote": "Deadlock is running. Mod changes apply on its next start.",
     "pending": "Applies on next start",
     "pendingHint": "You changed mods. The game loads the changes the next time it starts.",
     "modsOn": "mods on: {{count}}"

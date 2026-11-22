@@ -751,7 +751,7 @@ export default function App() {
                 {running ? t("game.running") : launching ? t("game.starting") : t("game.play")}
               </button>
               {(game === null || running || (pending && !running)) && (
-                <span className={`play-state ${!game ? "is-bad" : pending && !running ? "is-warn" : "is-live"}`} title={game === null ? t("game.notFoundHint") : undefined}>
+                <span className={`play-state ${!game ? "is-bad" : pending && !running ? "is-warn" : "is-live"}`} title={game === null ? t("game.notFoundHint") : running ? t("game.runningNote") : undefined}>
                   {!game ? t("game.notFound") : running ? t("game.runningHint") : t("game.pending")}
                 </span>
               )}

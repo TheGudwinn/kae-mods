@@ -43,6 +43,8 @@ function load(): Appearance {
     if (!raw) return DEFAULTS;
     const p = JSON.parse(raw) as Partial<Appearance>;
     if ((p.theme as string) === "glass") p.theme = "graphite";
+    // the redesign made Graphite the base look: settings saved before it start over on Graphite once
+    if (!(p as { v?: number }).v) p.theme = "graphite";
     return { ...DEFAULTS, ...p, home: { ...DEFAULTS.home, ...(p.home ?? {}) } };
   } catch {
     return DEFAULTS;
@@ -67,7 +69,7 @@ export function applyAppearance(a: Appearance = state) {
 export function setAppearance(patch: Partial<Appearance>) {
   state = { ...state, ...patch };
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    localStorage.setItem(KEY, JSON.stringify({ ...state, v: 2 }));
   } catch {
     /* private mode or full storage: the setting just lasts until restart */
   }
