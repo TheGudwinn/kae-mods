@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import Icon from "./Icons";
 import { useExit } from "../lib/motion";
 
-export type Option = { value: string; label: string };
+export type Option = { value: string; label: string; /** Small round picture shown before the label (a hero portrait). */ icon?: string };
 
 type Props = {
   value: string;
@@ -166,7 +166,10 @@ export default function Select({ value, options, onChange, label, disabled, clas
         onClick={() => (open ? close(false) : show())}
         onKeyDown={onKey}
       >
-        <span className="select-value">{current?.label ?? ""}</span>
+        <span className="select-value">
+          {current?.icon && <img className="sel-ico" src={current.icon} alt="" />}
+          {current?.label ?? ""}
+        </span>
         <Icon name="down" size={16} />
       </button>
       {menuOn &&
@@ -199,7 +202,10 @@ export default function Select({ value, options, onChange, label, disabled, clas
                 onPointerEnter={() => setActive(i)}
                 onClick={() => pick(i)}
               >
-                <span>{o.label}</span>
+                <span className="sel-label">
+                  {o.icon && <img className="sel-ico" src={o.icon} alt="" loading="lazy" />}
+                  {o.label}
+                </span>
                 {o.value === value && <Icon name="check" size={16} />}
               </li>
             ))}

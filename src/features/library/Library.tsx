@@ -12,6 +12,8 @@ import Icon from "../../components/Icons";
 import EmptyState from "../../components/EmptyState";
 import { openExternal } from "../../lib/open";
 import { Tags } from "./ContentView";
+import { useHeroPortraits } from "../../lib/portraits";
+import { realHeroes } from "../../lib/heroes";
 
 type Props = {
   mods: InstalledMod[] | null;
@@ -96,7 +98,7 @@ function Thumb({ url }: { url: string }) {
   );
 }
 
-export default function Library({ mods, groups, known, contents, last, busy, onToggle, onToggleForeign, onRemove, onUndo, onReorder, gameBuild, onGoFixes, onGoProfiles, report, checking, onCheckUpdates, onUpdate, onUpdateForeign, onBulkUpdate, onGoCatalog, compat, gameFound, gameRunning, onBulkToggle, onBulkRemove }: Props) {
+export default function Library({ mods, groups, known, contents, last, busy, onToggle, onToggleForeign, onRemove, onUndo, gameBuild, onGoFixes, onGoProfiles, report, checking, onCheckUpdates, onUpdate, onUpdateForeign, onBulkUpdate, onGoCatalog, compat, gameFound, gameRunning, onBulkToggle, onBulkRemove }: Props) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<Set<string>>(new Set()); // tiles selected for a bulk action
   const [query, setQuery] = useState("");
@@ -114,6 +116,7 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
     });
 
   const own = mods ?? [];
+  const portrait = useHeroPortraits();
   // the check is cheap to repeat and reads the mod files themselves, so it follows what is installed
   const filesKey = useMemo(() => [...own.flatMap((m) => m.files.map((f) => `${f.name}:${f.enabled}`)), ...groups.flatMap((g) => g.files.map((f) => `${f.name}:${f.enabled}`))].sort().join("|"), [own, groups]);
   const { scan: scanCompat } = compat;
@@ -142,7 +145,7 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
         state: m.enabled ? "on" : "off",
         content: c,
         size,
-        hero: c?.heroes[0]?.name ?? null,
+        hero: (c ? realHeroes(c.heroes)[0]?.name : null) ?? null,
         kinds: c ? mainKinds(c, 6) : [],
         found: !!cat,
         own: m,
@@ -163,7 +166,7 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
         state: groupState(g),
         content: g.content,
         size: g.size,
-        hero: g.content?.heroes[0]?.name ?? null,
+        hero: (g.content ? realHeroes(g.content.heroes)[0]?.name : null) ?? null,
         kinds: g.content ? mainKinds(g.content, 6) : [],
         found: !!mod,
         newer: newerOnCatalog(g, mod),
@@ -205,7 +208,6 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
   }, [items, q, status, kind, hero, onlyUpdates, sort, t]);
 
   const filtered = !!q || status !== "on" || !!kind || !!hero || onlyUpdates;
-  const reorderable = !filtered && sort === "load";
   const total = items.length;
   const totals = useMemo(
     () => ({ count: items.length, enabled: items.filter((i) => i.state !== "off").length, bytes: items.reduce((s, i) => s + i.size, 0) }),
@@ -215,14 +217,6 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
   const camMods = new Set((compat.report?.findings ?? []).filter((f) => f.kind.startsWith("camera_")).flatMap((f) => f.mods.map(shortName)));
   const canRepair = compat.report?.findings.some(isFixable) ?? false;
   const stale = gameBuild ? own.filter((m) => m.game_build && m.game_build !== gameBuild) : [];
-
-  const move = (from: number, to: number) => {
-    if (!mods || from === to || to < 0 || to >= mods.length) return;
-    const ids = mods.map((m) => m.id);
-    const [id] = ids.splice(from, 1);
-    ids.splice(to, 0, id);
-    onReorder(ids);
-  };
 
   const pickedItems = items.filter((i) => picked.has(i.key));
   const pickedOwn = pickedItems.flatMap((i) => (i.own ? [i.own.id] : []));
@@ -255,7 +249,6 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
   const renderRow = (it: Item) => {
     const m = it.own;
     const g = it.group;
-    const i = m ? own.findIndex((x) => x.id === m.id) : -1;
     const toggle = () => (m ? onToggle(m.id, it.state !== "on") : g && onToggleForeign(g, it.state !== "on"));
     const label = `${it.state === "on" ? t("home.disable") : t("home.enable")}: ${it.title}`;
     return (
@@ -263,10 +256,7 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
         <label className={`rack-pick ${picked.size > 0 ? "rack-pick-shown" : ""}`} title={t("library.select")}>
           <input type="checkbox" checked={picked.has(it.key)} aria-label={`${t("library.select")}: ${it.title}`} onChange={() => pick(it.key)} />
         </label>
-        <span className={`slot-plate ${m ? "" : "slot-plate-none"}`} title={m ? t("library.order") : undefined}>
-          {m ? (m.slot != null ? String(m.slot).padStart(2, "0") : "??") : "–"}
-        </span>
-        <div className="rack-thumb">{it.thumb ? <Thumb url={it.thumb} /> : <span aria-hidden>{(it.hero?.[0] ?? it.title[0]).toUpperCase()}</span>}</div>
+        <div className="rack-thumb">{it.thumb ? <Thumb url={it.thumb} /> : <span className="no-pic" aria-hidden>KAE<br />MODS</span>}</div>
         <div className="rack-main">
           <div className="rack-title" title={it.title}>
             {it.title}
@@ -286,16 +276,6 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
         </div>
         <div className="rack-tags">{it.content ? <Tags content={it.content} skipHero={!it.thumb && !!it.hero && !!g && !g.id} /> : <span className="rack-sub">{t("library.noContent")}</span>}</div>
         <div className="rack-actions">
-          {m && reorderable && own.length > 1 && (
-            <span className="mover" role="group" aria-label={t("library.order")}>
-              <button className="btn-icon" disabled={busy || i === 0} aria-label={`${t("library.moveUp")}: ${m.name}`} title={t("library.moveUp")} onClick={() => move(i, i - 1)}>
-                <Icon name="left" size={16} />
-              </button>
-              <button className="btn-icon" disabled={busy || i === own.length - 1} aria-label={`${t("library.moveDown")}: ${m.name}`} title={t("library.moveDown")} onClick={() => move(i, i + 1)}>
-                <Icon name="right" size={16} />
-              </button>
-            </span>
-          )}
           {m && it.update && (
             <button className="btn btn-sm" disabled={busy} onClick={() => onUpdate(m.id)}>
               {t("library.update")}
@@ -344,11 +324,10 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
           </div>
         </div>
         <p className="view-sub">{t("library.subtitle")}</p>
-        {(groups.length > 0 || own.length > 1) && (
+        {groups.length > 0 && (
           <details className="howto">
             <summary>{t("library.howItWorks")}</summary>
             {groups.length > 0 && <p className="note">{t("library.foreignWarn")}</p>}
-            {own.length > 1 && <p className="note">{t("library.orderNote")}</p>}
           </details>
         )}
         {report && !checking && (
@@ -420,7 +399,7 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
                 </button>
               ))}
             </div>
-            <Select className="select-filter" label={t("library.filterHero")} value={hero} onChange={setHero} options={[{ value: "", label: t("library.allHeroes") }, ...heroes.map((h) => ({ value: h, label: h }))]} />
+            <Select className="select-filter" label={t("library.filterHero")} value={hero} onChange={setHero} options={[{ value: "", label: t("library.allHeroes") }, ...heroes.map((h) => ({ value: h, label: h, icon: portrait(h) }))]} />
             <Select className="select-filter" label={t("library.filterKind")} value={kind} onChange={setKind} options={[{ value: "", label: t("library.allKinds") }, ...kinds.map((k) => ({ value: k, label: t(`kind.${k}`) }))]} />
             {((report && report.updates.length > 0) || items.some((i) => i.newer)) && (
               <label className="check">
@@ -447,11 +426,6 @@ export default function Library({ mods, groups, known, contents, last, busy, onT
       )}
 
       {visible.length > 0 && <ul className="rack">
-          <li className="rack-head" aria-hidden="true">
-            <span />
-            <span title={t("library.slotHint")}>{t("library.slotCol")}</span>
-            <span>{t("library.modCol")}</span>
-          </li>
           {visible.map(renderRow)}
         </ul>}
 

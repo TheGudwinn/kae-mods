@@ -1,10 +1,19 @@
+import type { Mod } from "../../lib/api";
+import type { CachedMod } from "../../lib/modcache";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { call, type Profile } from "../../lib/api";
 import { openIssue } from "../../lib/github";
 import { codeModCount, parseCollections, useRemote } from "../../lib/remote";
+import { useModInfo } from "../../lib/thumbs";
+import { useHeroPortraits } from "../../lib/portraits";
+import { catClass } from "../../lib/format";
+import Icon from "../../components/Icons";
 import Select from "../../components/Select";
 import EmptyState from "../../components/EmptyState";
+
+/** Catalog categories that name a kind of mod; any other category is a hero. */
+const GENERIC = new Set(["Skins", "HUD", "Quality of Life/Fixes", "Animations", "Gameplay Modifications", "Maps", "Model Replacement", "Other/Misc", "Sounds", "Misc"]);
 
 type Props = {
   profiles: Profile[] | null;
@@ -19,9 +28,10 @@ type Props = {
   onCopyCode: (p: Profile) => void;
   onImportCode: (code: string) => Promise<boolean>;
   onGoLibrary: () => void;
+  onOpen: (m: Mod) => void;
 };
 
-export default function Profiles({ profiles, busy, onCreate, onApply, onUpdate, onRename, onDelete, onExport, onImport, onCopyCode, onImportCode, onGoLibrary }: Props) {
+export default function Profiles({ profiles, busy, onCreate, onApply, onUpdate, onRename, onDelete, onExport, onImport, onCopyCode, onImportCode, onGoLibrary, onOpen }: Props) {
   const { t } = useTranslation();
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
@@ -42,6 +52,11 @@ export default function Profiles({ profiles, busy, onCreate, onApply, onUpdate, 
     } else setSuggestNote(t("collections.opened"));
   };
   const [editing, setEditing] = useState<{ id: number; value: string } | null>(null);
+  const portrait = useHeroPortraits();
+  // a tile opens the mod's card, built from what the catalog told us about it
+  const open = (m: { source: string; remote_id: string; name: string; version: string | null }, c?: CachedMod) =>
+    onOpen({ source: m.source, id: m.remote_id, name: c?.name ?? m.name, author: c?.author ?? null, category: c?.category ?? null, thumbnail: c?.thumbnail ?? null, version: m.version, likes: 0, views: 0, updated_at: c?.updated_at ?? 0, page_url: c?.page_url ?? `https://gamebanana.com/mods/${m.remote_id}` });
+  const info = useModInfo((profiles ?? []).flatMap((p) => p.mods.map((m) => m.remote_id)));
 
   return (
     <section className="view">
@@ -123,19 +138,38 @@ export default function Profiles({ profiles, busy, onCreate, onApply, onUpdate, 
                   {t("profiles.counts", { total: p.mods.length, on })}
                   {missing > 0 && <span className="missing"> · {t("profiles.missingCount", { count: missing })}</span>}
                 </div>
-                <details className="profile-mods">
-                  <summary>{t("profiles.show")}</summary>
-                  {p.mods.length === 0 && <p className="note">{t("profiles.empty_set")}</p>}
-                  <ul>
-                    {p.mods.map((m) => (
-                      <li key={`${m.source}:${m.remote_id}`} className={m.installed ? "" : "is-missing"}>
-                        <span className={`state ${m.enabled ? "state-on" : ""}`}>{m.enabled ? t("profiles.on") : t("profiles.off")}</span>
-                        <span className="pm-name">{m.name}</span>
-                        {!m.installed && <span className="pm-missing">{t("profiles.notInstalled")}</span>}
+                <ul className="bm-grid">
+                  {p.mods.length === 0 && <li className="note">{t("profiles.empty_set")}</li>}
+                  {p.mods.map((m) => {
+                    const c = info[m.remote_id];
+                    return (
+                      <li key={`${m.source}:${m.remote_id}`} className={`bm ${m.installed ? "bm-have" : ""} ${m.enabled ? "" : "bm-off"}`} title={m.name} role="button" tabIndex={0} onClick={() => open(m, c)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), open(m, c))}>
+                        <span className="bm-pic" style={c?.thumbnail ? { backgroundImage: `url(${c.thumbnail})` } : undefined}>
+                          {!c?.thumbnail && <span className="no-pic" aria-hidden>KAE MODS</span>}
+                          {m.installed && (
+                            <span className="bm-check" aria-hidden="true">
+                              <Icon name="check" size={13} />
+                            </span>
+                          )}
+                        </span>
+                        <span className="bm-name">{m.name}</span>
+                        <span className="bm-foot">
+                          {c?.category ? (
+                            <span className="tags bm-tags">
+                              <span className={`tag ${GENERIC.has(c.category) ? catClass(c.category) : "tag-hero"}`}>
+                                {!GENERIC.has(c.category) && portrait(c.category) && <img className="tag-ico" src={portrait(c.category)} alt="" />}
+                                {c.category}
+                              </span>
+                            </span>
+                          ) : (
+                            <span />
+                          )}
+                          <span className={`bm-state ${m.installed ? "bm-state-ok" : ""}`}>{m.installed ? (m.enabled ? t("profiles.on") : t("profiles.off")) : t("profiles.notInstalled")}</span>
+                        </span>
                       </li>
-                    ))}
-                  </ul>
-                </details>
+                    );
+                  })}
+                </ul>
               </div>
 
               <div className="profile-actions">

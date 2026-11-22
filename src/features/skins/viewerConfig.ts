@@ -22,7 +22,7 @@ export type ViewerCfg = {
 
 export const DEFAULT_CFG: ViewerCfg = { wire: false, floor: true, gizmo: true, spin: false, bg: "dark", smaa: true, glow: true, light: "studio", exposure: 1, fov: 35 };
 
-export const BG_COLOR: Record<Bg, number> = { dark: 0x09090b, slate: 0x2a2f3a, light: 0xd9dce2 };
+export const BG_COLOR: Record<Bg, number> = { dark: 0x09090b, slate: 0x1b1b1e, light: 0xd9dce2 };
 
 /** Light intensities per preset: [environment, key, rim, fill]. */
 export const LIGHTS: Record<LightPreset, [number, number, number, number]> = {

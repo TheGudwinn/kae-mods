@@ -37,18 +37,20 @@ import Confirm, { type ConfirmState } from "./components/Confirm";
 import History, { type HistoryItem } from "./components/History";
 import { setAppearance, useAppearance, useEffectiveWallpaper, useWallpaper, wallVideo } from "./lib/appearance";
 import Home from "./features/home/Home";
-import logo from "./assets/logo.svg";
+import Welcome from "./features/welcome/Welcome";
+import gameMark from "./assets/deadlock/mark.webp";
 import Catalog from "./features/store/Catalog";
 import ModDrawer from "./features/store/ModDrawer";
 import Library from "./features/library/Library";
 import Profiles from "./features/profiles/Profiles";
+import Loadouts from "./features/loadouts/Loadouts";
 import Settings from "./features/settings/Settings";
 import Downloads from "./features/downloads/Downloads";
 import Performance from "./features/performance/Performance";
 import Fixes from "./features/fixes/Fixes";
 const Skins = lazy(() => import("./features/skins/Skins")); // pulls in the 3D engine, so it loads on first visit
 
-type View = "home" | "catalog" | "library" | "profiles" | "downloads" | "performance" | "fixes" | "skins" | "settings";
+type View = "home" | "catalog" | "library" | "profiles" | "loadouts" | "downloads" | "performance" | "fixes" | "skins" | "settings";
 
 export default function App() {
   const { t } = useTranslation();
@@ -74,7 +76,6 @@ export default function App() {
   const railRef = useRef<HTMLElement>(null);
   const [ind, setInd] = useState<{ y: number; h: number } | null>(null);
   const [indReady, setIndReady] = useState(false);
-  const [searchText, setSearchText] = useState("");
   const [search, setSearch] = useState({ text: "", n: 0 });
   const [preset, setPreset] = useState<{ category: number | null; sub: number | null; n: number } | undefined>(undefined);
   const [game, setGame] = useState<GameInstall | null | undefined>(undefined);
@@ -91,6 +92,23 @@ export default function App() {
   const [activity, setActivity] = useState<ActivityState | null>(null);
   const [update, setUpdate] = useState<UpdateInfo | null>(null);
   const [maximized, setMaximized] = useState(false);
+  // the first start shows what the manager is; it never comes back once closed
+  const [welcome, setWelcome] = useState(() => {
+    try {
+      return !localStorage.getItem("kae.welcome");
+    } catch {
+      return false;
+    }
+  });
+  const closeWelcome = (to?: View) => {
+    setWelcome(false);
+    if (to) setView(to);
+    try {
+      localStorage.setItem("kae.welcome", "1");
+    } catch {
+      /* it just shows again next time */
+    }
+  };
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [queue, setQueue] = useState<QueueRow[]>([]);
   // bumped when an update ends, so the history on the downloads page is read again
@@ -107,7 +125,6 @@ export default function App() {
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [unread, setUnread] = useState(0);
-  const searchBox = useRef<HTMLInputElement>(null);
   const [launched, setLaunched] = useState(() => {
     try {
       return localStorage.getItem("guddion.launched") === "1";
@@ -579,25 +596,38 @@ export default function App() {
   useLayoutEffect(() => {
     const place = () => {
       const el = railRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+      // the soft corners above/below the tab must not stick out over the top bar, so tell the CSS how much room there is above
+      const room = el && railRef.current ? Math.max(0, Math.min(28, el.offsetTop - ((document.querySelector(".page")?.getBoundingClientRect().top ?? 0) - railRef.current.getBoundingClientRect().top))) : 28;
+      railRef.current?.style.setProperty("--ind-room", `${room}px`);
       setInd(el ? { y: el.offsetTop, h: el.offsetHeight } : null);
       if (el) requestAnimationFrame(() => requestAnimationFrame(() => setIndReady(true)));
     };
     place();
     window.addEventListener("resize", place);
-    return () => window.removeEventListener("resize", place);
-  }, [view, look.rail]);
+    // anything that moves the items (update banner, badges, fullscreen, the rail opening) must move the highlight too
+    const ro = new ResizeObserver(place);
+    const rail = railRef.current;
+    if (rail) {
+      ro.observe(rail);
+      rail.querySelectorAll(".rail-item, .rail-games, .rail-logo").forEach((n) => ro.observe(n));
+    }
+    return () => {
+      window.removeEventListener("resize", place);
+      ro.disconnect();
+    };
+  }, [view, look.rail, !!update, maximized]);
   // mods built for an older game build that a patch may have broken (hidden once the user dismisses the notice)
   const patchBuild = game?.build_id ?? null;
   const patchBadge = patchAcked(patchBuild) ? 0 : findSuspects(installed, contents, patchBuild, modReport).filter((x) => x.risk !== "low").length;
-  const order: View[] = ["home", "catalog", "library", "skins", "fixes", "settings"];
+  const order: View[] = ["home", "catalog", "library", "profiles", "skins", "settings"];
   // pages that live under another rail item: profiles under the library, performance under diagnostics
-  const railOf = (v: View): View | null => (v === "profiles" ? "library" : v === "performance" ? "fixes" : v === "downloads" ? null : v);
+  const railOf = (v: View): View | null => (v === "performance" || v === "fixes" ? "settings" : v === "loadouts" ? "profiles" : v === "downloads" ? null : v);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         // the library has its own search box, so the top one is hidden there
-        const box = searchBox.current ?? document.querySelector<HTMLInputElement>("input[data-page-search]");
+        const box = document.querySelector<HTMLInputElement>("input[data-page-search]");
         box?.focus();
         box?.select();
       } else if (e.altKey && !e.ctrlKey && /^[1-9]$/.test(e.key)) {
@@ -610,60 +640,74 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `order` is a constant list
   }, []);
-  const diagTabs = (
-    <div className="tabs" role="tablist" aria-label={t("nav.fixes")}>
-      {(["fixes", "performance"] as const).map((id) => (
+  const tabBar = (ids: readonly View[], label: (id: View) => string, aria: string) => (
+    <div className="tabs" role="tablist" aria-label={aria}>
+      {ids.map((id) => (
         <button key={id} type="button" role="tab" aria-selected={view === id} className={`tab ${view === id ? "tab-on" : ""}`} onClick={() => setView(id)}>
-          {t(`diag.${id}`)}
+          {label(id)}
         </button>
       ))}
     </div>
   );
-  const hint = (id: View) => `${t(`nav.${id}`)}  ·  Alt+${order.indexOf(id) + 1}`;
+  // settings, the checks and the performance page share one rail item; builds and profiles share another
+  const diagTabs = tabBar(["settings", "fixes", "performance"], (id) => (id === "settings" ? t("nav.settings") : t(`diag.${id}`)), t("nav.settings"));
+  const buildTabs = tabBar(["profiles", "loadouts"], (id) => t(`nav.${id}`), t("nav.profilesAll"));
+  const navName = (id: View) => (id === "profiles" ? t("nav.profilesAll") : t(`nav.${id}`));
+  const hint = (id: View) => `${navName(id)}  ·  Alt+${order.indexOf(id) + 1}`;
   const activeProfile = profiles?.find((x) => x.active);
   const current = activeDownloads.find((r) => r.state === "downloading") ?? activeDownloads[0];
   const currentPct = current?.total ? Math.min(100, Math.round((current.downloaded / current.total) * 100)) : null;
 
   return (
     <div className={`shell ${maximized ? "maximized" : ""}`}>
-      {wallpaper && (
-        <div className="wallpaper" aria-hidden="true" style={{ backgroundImage: `url(${wallpaper})` }}>
-          {/* the shipped animated background, unless the player chose a picture or turned motion off */}
-          {wallVideo && !ownWallpaper && look.motion !== "off" && <video className="wallpaper-video" src={wallVideo} poster={wallpaper} autoPlay loop muted playsInline preload="auto" />}
-        </div>
-      )}
       <div className="grain" aria-hidden="true" />
       <nav ref={railRef} className={`rail ${look.rail === "open" ? "rail-open" : "rail-closed"}`} aria-label={t("app.name")}>
         <span className={`rail-ind ${indReady ? "rail-ind-ready" : ""}`} aria-hidden="true" style={ind ? { transform: `translateY(${ind.y}px)`, height: ind.h, opacity: 1 } : { opacity: 0 }} />
         <div className="rail-logo" data-tauri-drag-region title={t("app.name")}>
-          <img src={logo} alt="" width={30} height={30} />
-          <span className="rail-brand">{t("app.name")}</span>
+          {/* two words of the same width: the letters are spread edge to edge */}
+          {["KAE", "MODS"].map((w) => (
+            <span key={w} className="rail-word" aria-hidden="true">
+              {[...w].map((c, i) => (
+                <span key={i}>{c}</span>
+              ))}
+            </span>
+          ))}
+          <span className="sr-only">{t("app.name")}</span>
         </div>
+        <div className="rail-spacer" data-tauri-drag-region />
         {(
           [
             ["home", "home", 0],
             ["catalog", "catalog", 0],
             ["library", "library", modReport?.updates.length ?? 0],
+            ["profiles", "layers", 0],
             ["skins", "skins", 0],
-            ["fixes", "fixes", patchBadge],
           ] as const
         ).map(([id, icon, badge]) => (
-          <button key={id} className="rail-item" data-tip={hint(id)} aria-current={railOf(view) === id ? "page" : undefined} aria-label={t(`nav.${id}`)} aria-keyshortcuts={`Alt+${order.indexOf(id) + 1}`} onClick={() => setView(id)}>
+          <button key={id} className="rail-item" data-tip={hint(id)} aria-current={railOf(view) === id ? "page" : undefined} aria-label={navName(id)} aria-keyshortcuts={`Alt+${order.indexOf(id) + 1}`} onClick={() => setView(id)}>
             <Icon name={icon} />
-            <span className="rail-label">{t(`nav.${id}`)}</span>
+            <span className="rail-label">{navName(id)}</span>
             {badge > 0 && <span className="rail-badge">{badge}</span>}
           </button>
         ))}
         <div className="rail-spacer" data-tauri-drag-region />
         {update && look.rail === "open" && <UpdateBanner info={update} progress={updatePct} onInstall={() => void installUpdate()} onDismiss={() => setUpdate(null)} />}
-        <button className="rail-item" data-tip={t("nav.feedback")} aria-label={t("nav.feedback")} onClick={() => setFeedbackOpen(true)}>
-          <Icon name="chat" />
-          <span className="rail-label">{t("nav.feedback")}</span>
-        </button>
-        <button className="rail-item" data-tip={hint("settings")} aria-current={view === "settings" ? "page" : undefined} aria-label={t("nav.settings")} onClick={() => setView("settings")}>
+        <button className="rail-item" data-tip={hint("settings")} aria-current={railOf(view) === "settings" ? "page" : undefined} aria-label={t("nav.settings")} onClick={() => setView("settings")}>
           <Icon name="settings" />
           <span className="rail-label">{t("nav.settings")}</span>
+          {patchBadge > 0 && <span className="rail-badge">{patchBadge}</span>}
         </button>
+        <div className="rail-games" role="group" aria-label={t("games.title")}>
+          <button className="game-btn" aria-current="true" data-tip="Deadlock" aria-label="Deadlock" onClick={() => setView("home")}>
+            <img src={gameMark} alt="" />
+            <span className={`dot ${game === null ? "off" : ""}`} aria-hidden="true" />
+            <span className="game-name">Deadlock</span>
+          </button>
+          <button className="game-btn game-add" disabled data-tip={t("games.soon")} aria-label={t("games.soon")}>
+            <Icon name="plus" size={18} />
+            <span className="game-name">{t("games.soon")}</span>
+          </button>
+        </div>
         <button
           className="rail-item rail-fold"
           data-tip={look.rail === "open" ? t("nav.collapse") : t("nav.expand")}
@@ -678,31 +722,6 @@ export default function App() {
 
       <div className="stage">
         <header className="topbar" data-tauri-drag-region>
-          {view !== "library" && (
-          <form
-            className="topsearch"
-            role="search"
-            onSubmit={(e) => {
-              e.preventDefault();
-              setSearch((x) => ({ text: searchText.trim(), n: x.n + 1 }));
-              setView("catalog");
-            }}
-          >
-            <input
-              ref={searchBox}
-              className="field"
-              type="search"
-              value={searchText}
-              placeholder={t("catalog.search")}
-              aria-label={t("catalog.search")}
-              aria-keyshortcuts="Control+K"
-              onChange={(e) => setSearchText(e.target.value)}
-            />
-            <kbd className="kbd" aria-hidden="true">
-              Ctrl K
-            </kbd>
-          </form>
-          )}
           <div className="spacer" data-tauri-drag-region />
           <div className="status" data-tauri-drag-region>
             <button className="chip chip-btn" onClick={() => setView("downloads")} title={t("downloads.title")} aria-current={view === "downloads" ? "page" : undefined}>
@@ -731,23 +750,27 @@ export default function App() {
                 <Icon name="play" />
                 {running ? t("game.running") : launching ? t("game.starting") : t("game.play")}
               </button>
-              <span className={`play-state ${!game && game !== undefined ? "is-bad" : pending && !running ? "is-warn" : running ? "is-live" : ""}`} title={game === null ? t("game.notFoundHint") : undefined}>
-                {game === undefined
-                  ? "…"
-                  : !game
-                    ? t("game.notFound")
-                    : running
-                      ? t("game.runningHint")
-                      : pending
-                        ? t("game.pending")
-                        : [game.build_id ? `#${game.build_id}` : t("game.found"), t("game.modsOn", { count: (installed ?? []).filter((m) => m.enabled).length })].join(" · ")}
-              </span>
+              {(game === null || running || (pending && !running)) && (
+                <span className={`play-state ${!game ? "is-bad" : pending && !running ? "is-warn" : "is-live"}`} title={game === null ? t("game.notFoundHint") : undefined}>
+                  {!game ? t("game.notFound") : running ? t("game.runningHint") : t("game.pending")}
+                </span>
+              )}
             </div>
+            <button className="btn-icon" aria-label={t("nav.feedback")} title={t("nav.feedback")} onClick={() => setFeedbackOpen(true)}>
+              <Icon name="chat" size={16} />
+            </button>
             <History items={history} unread={unread} onOpen={() => setUnread(0)} onClear={() => setHistory([])} />
           </div>
           {isTauri && <WindowControls onMaximizedChange={setMaximized} />}
         </header>
 
+      <div className={`page ${wallpaper ? "page-wall" : ""}`}>
+      {wallpaper && (
+          <div className="wallpaper" aria-hidden="true" style={{ backgroundImage: `url(${wallpaper})` }}>
+            {/* the shipped animated background, unless the player chose a picture or turned motion off */}
+            {wallVideo && look.theme === "deadlock" && !ownWallpaper && look.motion !== "off" && <video className="wallpaper-video" src={wallVideo} poster={wallpaper} autoPlay loop muted playsInline preload="auto" />}
+          </div>
+        )}
       <main className="main">
         <ErrorBoundary key={view}>
         {view === "home" ? (
@@ -795,6 +818,8 @@ export default function App() {
             historyKey={historyKey}
           />
         ) : view === "settings" ? (
+          <>
+          {diagTabs}
           <Settings
             game={game}
             onCheckUpdate={checkUpdate}
@@ -803,8 +828,9 @@ export default function App() {
               void refresh();
             }}
           />
+          </>
         ) : view === "skins" ? (
-          <Suspense fallback={null}><Skins mods={installed} groups={groups} known={known} contents={contents} gameFound={!!game} onToggle={toggle} onToggleForeign={toggleForeign} onGoCatalog={() => setView("catalog")} onFind={(text) => { setSearchText(text); setSearch((x) => ({ text, n: x.n + 1 })); setView("catalog"); }} /></Suspense>
+          <Suspense fallback={null}><Skins mods={installed} groups={groups} known={known} contents={contents} gameFound={!!game} onToggle={toggle} onToggleForeign={toggleForeign} onGoCatalog={() => setView("catalog")} onFind={(text) => { setSearch((x) => ({ text, n: x.n + 1 })); setView("catalog"); }} /></Suspense>
         ) : view === "performance" ? (
           <>
             {diagTabs}
@@ -833,7 +859,14 @@ export default function App() {
             }}
           />
           </>
+        ) : view === "loadouts" ? (
+          <>
+          {buildTabs}
+          <Loadouts builds={profiles} busy={busy} onApplyBuild={applyProfile} onGoBuilds={() => setView("profiles")} />
+          </>
         ) : view === "profiles" ? (
+          <>
+          {buildTabs}
           <Profiles
             profiles={profiles}
             busy={busy}
@@ -847,7 +880,9 @@ export default function App() {
             onImport={importProfile}
             onCopyCode={copyProfileCode}
             onImportCode={importProfileCode}
+            onOpen={setOpen}
           />
+          </>
         ) : (
           <Library
             mods={installed}
@@ -880,9 +915,11 @@ export default function App() {
         )}
         </ErrorBoundary>
       </main>
+      </div>
 
       </div>
 
+      {welcome && <Welcome onDone={closeWelcome} />}
       <TooltipLayer />
       {feedbackOpen && <Feedback build={game?.build_id ?? null} onClose={() => setFeedbackOpen(false)} />}
       {open && <ModDrawer mod={open} installed={installedIds.has(open.id)} queued={queuedModIds.has(open.id)} busy={busy} onClose={() => setOpen(null)} onInstall={(m, f) => void install(m, f)} />}

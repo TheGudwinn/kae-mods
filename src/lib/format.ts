@@ -88,3 +88,6 @@ export function htmlToText(html: string): string {
   const doc = new DOMParser().parseFromString(html, "text/html");
   return (doc.body.textContent ?? "").replace(/\s+/g, " ").trim();
 }
+
+/** CSS class of a catalog category, so every category has its own badge colour (design.css: .tag-c-*). */
+export const catClass = (c: string | null | undefined) => `tag-c-${(c ?? "other").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;

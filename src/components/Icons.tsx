@@ -28,8 +28,9 @@ const paths: Record<string, ReactNode> = {
   ),
   settings: (
     <>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4 18 18M18 6l-1.6 1.6M7.6 16.4 6 18" />
+      <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+      <circle cx="15" cy="7" r="2" />
+      <circle cx="9" cy="17" r="2" />
     </>
   ),
   performance: (
@@ -55,6 +56,7 @@ const paths: Record<string, ReactNode> = {
   right: <path d="M9.5 6l6 6-6 6" />,
   check: <path d="M5.5 12.5 10 17l8.5-9.5" />,
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  plus: <path d="M12 5v14M5 12h14" />,
   sidebar: (
     <>
       <rect x="3.5" y="4.5" width="17" height="15" rx="3" />

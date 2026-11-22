@@ -24,7 +24,7 @@ export const HEROES: Hero[] = [
   { name: "Infernus", codes: ["inferno", "infernus"] },
   { name: "Ivy", codes: ["tengu", "ivy"] },
   { name: "Kelvin", codes: ["kelvin"] },
-  { name: "Lady Geist", codes: ["spectre", "ghost", "lady_geist"] },
+  { name: "Lady Geist", codes: ["spectre", "ghost", "geist", "lady_geist"] },
   { name: "Lash", codes: ["lash"] },
   { name: "McGinnis", codes: ["forge", "engineer", "mcginnis"] },
   { name: "Mina", codes: ["vampirebat", "mina"] },
@@ -64,4 +64,21 @@ const clean = (code: string) =>
 export function heroOfCode(code: string): Hero | null {
   const c = clean(code);
   return HEROES.find((h) => h.codes.includes(c) || h.codes.some((x) => x.replace(/_/g, "") === c.replace(/_/g, ""))) ?? null;
+}
+
+/** Folders that sit next to hero folders in mods but are not heroes (confirmed from real mods). */
+const NOT_HEROES = new Set(["backgrounds", "names", "guns", "common", "shared"]);
+
+/**
+ * The heroes a mod really touches: folders that are not heroes are dropped, versioned names (`hornet_v3`)
+ * get the hero's proper name, and two codes of one hero show once.
+ */
+export function realHeroes<T extends { code: string; name: string }>(list: T[]): (T & { name: string })[] {
+  const out: (T & { name: string })[] = [];
+  for (const h of list) {
+    if (NOT_HEROES.has(h.code.toLowerCase().replace(/_?v\d+$/, ""))) continue;
+    const name = heroOfCode(h.code)?.name ?? h.name;
+    if (!out.some((x) => x.name === name)) out.push({ ...h, name });
+  }
+  return out;
 }

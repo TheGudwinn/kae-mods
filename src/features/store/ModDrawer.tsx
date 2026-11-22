@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { call, type Content, type Mod, type ModDetails } from "../../lib/api";
-import { Peek, Tags } from "../library/ContentView";
+import { call, type Mod, type ModDetails } from "../../lib/api";
 import { openExternal } from "../../lib/open";
 import Icon from "../../components/Icons";
 import { fileExt, formatBytes, htmlToText, humanizeError, isInstallable } from "../../lib/format";
@@ -25,17 +24,6 @@ export default function ModDrawer({ mod, installed, queued, busy, onClose, onIns
   const [slow, setSlow] = useState(false); // details are taking long: offer a retry
   const [attempt, setAttempt] = useState(0);
   const [closing, setClosing] = useState(false);
-  // what a file changes, found by downloading it into a scratch folder (nothing is installed)
-  const [peek, setPeek] = useState<Record<string, { state: "loading" | "done" | "error"; content?: Content; error?: string }>>({});
-  const peekFile = async (fileId: string) => {
-    setPeek((p) => ({ ...p, [fileId]: { state: "loading" } }));
-    try {
-      const content = await call<Content>("peek_mod_file", { modId: mod.id, fileId });
-      setPeek((p) => ({ ...p, [fileId]: { state: "done", content } }));
-    } catch (e) {
-      setPeek((p) => ({ ...p, [fileId]: { state: "error", error: humanizeError(t, e) } }));
-    }
-  };
   const close = () => {
     setClosing(true);
     window.setTimeout(onClose, 200);
@@ -151,21 +139,15 @@ export default function ModDrawer({ mod, installed, queued, busy, onClose, onIns
                     <div className="file-info">
                       <div className="file-name">{f.name}</div>
                       <div className="file-sub">
-                        {formatBytes(f.size)} · <span className={f.av_clean ? "av-ok" : "av-warn"}>{f.av_clean ? t("drawer.avClean") : t("drawer.av")}</span>
+                        {formatBytes(f.size)}
+                        {!f.av_clean && (
+                          <>
+                            {" · "}
+                            <span className="av-warn">{t("drawer.av")}</span>
+                          </>
+                        )}
                       </div>
                       {!ok && <div className="file-sub">{t("drawer.unsupported", { ext: fileExt(f.name) || "?" })}</div>}
-                      {ok && !installed && peek[f.id]?.state !== "done" && (
-                        <button className="link file-peek" title={t("drawer.peekHint")} disabled={peek[f.id]?.state === "loading"} onClick={() => void peekFile(f.id)}>
-                          {peek[f.id]?.state === "loading" ? t("drawer.peeking") : t("drawer.peek")}
-                        </button>
-                      )}
-                      {peek[f.id]?.state === "error" && <div className="file-sub note-warn">{peek[f.id]?.error}</div>}
-                      {peek[f.id]?.content && (
-                        <>
-                          <Tags content={peek[f.id].content!} />
-                          <Peek content={peek[f.id].content!} />
-                        </>
-                      )}
                     </div>
                     <button className={`btn ${installed || queued ? "" : "btn-primary"}`} disabled={!ok || installed || queued || busy} onClick={() => onInstall(mod, f.id)}>
                       {installed ? t("drawer.installed") : queued ? t("drawer.queued") : t("drawer.install")}

@@ -1,12 +1,20 @@
 import { useSyncExternalStore } from "react";
 import defaultWall from "../assets/deadlock/default-wall.webp";
+import gradientWall from "../assets/backgrounds/gradient.webp";
+import wavesWall from "../assets/backgrounds/waves.webp";
+
+/** Pictures that ship with the app and can be picked as the background. */
+export const WALL_PRESETS = { gradient: gradientWall, waves: wavesWall } as const;
+export type WallPreset = keyof typeof WALL_PRESETS | "none";
 
 /** What the user can change about how the launcher looks. Stored in localStorage, applied as attributes and CSS variables on <html>. */
 export type Appearance = {
   /** Launcher look: a set of design tokens (see themes.css). */
-  theme: "graphite" | "glass" | "deadlock";
+  theme: "graphite" | "deadlock";
   motion: "full" | "calm" | "off";
   density: "compact" | "normal" | "roomy";
+  /** Shipped background used when the player has not picked their own picture. */
+  wallPreset: WallPreset;
   /** How much the picture behind the interface is darkened, 0-90, and blurred, 0-24 px. */
   wallDim: number;
   wallBlur: number;
@@ -20,9 +28,10 @@ export const DEFAULTS: Appearance = {
   theme: "graphite",
   motion: "full",
   density: "normal",
+  wallPreset: "gradient",
   wallDim: 55,
   wallBlur: 0,
-  rail: "open",
+  rail: "closed",
   home: { hero: true, popular: true, mine: true, stats: true },
 };
 
@@ -33,6 +42,7 @@ function load(): Appearance {
     const raw = localStorage.getItem(KEY);
     if (!raw) return DEFAULTS;
     const p = JSON.parse(raw) as Partial<Appearance>;
+    if ((p.theme as string) === "glass") p.theme = "graphite";
     return { ...DEFAULTS, ...p, home: { ...DEFAULTS.home, ...(p.home ?? {}) } };
   } catch {
     return DEFAULTS;
@@ -124,7 +134,10 @@ export const wallVideo: string | null = Object.values(videos)[0] ?? null;
 export function useEffectiveWallpaper(): string | null {
   const own = useWallpaper();
   const a = useAppearance();
-  return own ?? (a.theme === "deadlock" || wallVideo ? defaultWall : null);
+  // the shipped picture and video belong to the Deadlock skin; the base look is plain graphite
+  if (own) return own;
+  if (a.theme === "deadlock") return defaultWall;
+  return a.wallPreset === "none" ? null : WALL_PRESETS[a.wallPreset] ?? null;
 }
 
 export function useAppearance(): Appearance {

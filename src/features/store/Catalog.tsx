@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { call, type Category, type Mod, type Page, type Sort } from "../../lib/api";
-import { compact, humanizeError } from "../../lib/format";
+import { catClass, compact, humanizeError } from "../../lib/format";
 import Select from "../../components/Select";
+import { heroKey } from "../../lib/portraits";
 import Icon from "../../components/Icons";
 import EmptyState from "../../components/EmptyState";
 
@@ -168,7 +169,7 @@ export default function Catalog({ installedIds, onOpen, search, preset, onGoSett
         </div>
         <div className="toolbar">
           <div className="search-box">
-            <input className="field search" type="search" value={text} placeholder={t("catalog.search")} aria-label={t("catalog.search")} onChange={(e) => setText(e.target.value)} />
+            <input className="field search" data-page-search type="search" value={text} placeholder={t("catalog.search")} aria-label={t("catalog.search")} onChange={(e) => setText(e.target.value)} />
           </div>
           <Select
             label={t("catalog.sort.most_liked")}
@@ -313,21 +314,35 @@ export default function Catalog({ installedIds, onOpen, search, preset, onGoSett
                     <span className="tile-likes">
                       <Heart /> {compact(m.likes)}
                     </span>
+                    {have && (
+                      <span className="tile-have-badge" aria-hidden="true">
+                        <Icon name="check" size={16} />
+                      </span>
+                    )}
                   </button>
                   <div className="tile-body">
                     <div className="tile-title" title={m.name}>
                       {m.name}
                     </div>
-                    <div className="tile-meta">{[m.author, m.category].filter(Boolean).join(" · ")}</div>
-                    <div className="tile-flags">{have && <span className="flag flag-ok">{t("catalog.installed")}</span>}</div>
+                    {m.category && (
+                      <span className={`tile-cat ${catClass(m.category)}`}>
+                        {portraits[heroKey(m.category)] && <img className="tag-ico" src={portraits[heroKey(m.category)]} alt="" />}
+                        {m.category}
+                      </span>
+                    )}
                   </div>
-                  {!have && (
-                    <div className="tile-actions">
+                  <div className="tile-actions">
+                    {have ? (
+                      <span className="tile-done">
+                        <Icon name="check" size={16} />
+                        {t("catalog.installed")}
+                      </span>
+                    ) : (
                       <button className="btn btn-sm" onClick={() => onOpen(m)}>
                         {t("drawer.install")}
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </li>
               );
             })}

@@ -1,3 +1,5 @@
+import { realHeroes } from "../../lib/heroes";
+import { useHeroPortraits } from "../../lib/portraits";
 import { useTranslation } from "react-i18next";
 import type { Content } from "../../lib/api";
 import { formatBytes } from "../../lib/format";
@@ -6,11 +8,13 @@ import { formatBytes } from "../../lib/format";
 export function Tags({ content, skipHero = false }: { content: Content; skipHero?: boolean }) {
   const { t } = useTranslation();
   const kinds = content.kinds.filter((k) => k.kind !== "other" || content.kinds.length === 1).slice(0, 3);
-  const heroes = skipHero ? [] : content.heroes.slice(0, 2);
+  const heroes = skipHero ? [] : realHeroes(content.heroes).slice(0, 2);
+  const portrait = useHeroPortraits();
   return (
     <div className="tags">
       {heroes.map((h) => (
         <span key={h.code} className="tag tag-hero" title={`${t("library.heroHint")}: ${h.code}`}>
+          {portrait(h.name) && <img className="tag-ico" src={portrait(h.name)} alt="" />}
           {h.name}
         </span>
       ))}

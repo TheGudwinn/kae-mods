@@ -3,10 +3,51 @@
     "name": "Kae Mods",
     "sub": "Mod manager"
   },
+  "welcome": {
+    "open": "Open",
+    "title": "Mods for your favourite games, in one window",
+    "text": "Kae Mods finds, installs and updates mods and keeps the game folder tidy. It works with Deadlock today, more games are coming.",
+    "skip": "Skip",
+    "start": "Get started",
+    "stepsNote": {"find": "We locate Steam and the game on our own, nothing to type.", "pick": "Mods from the catalog install in one click; switch them on and off in the library.", "play": "Press Play: mods apply by themselves and every change can be undone."},
+    "steps": {
+      "find": "We find the game",
+      "pick": "Pick your mods",
+      "play": "Press Play"
+    },
+    "features": {
+      "catalog": {
+        "title": "Catalog",
+        "text": "Thousands of mods from GameBanana: search, preview and install in one click."
+      },
+      "library": {
+        "title": "Library",
+        "text": "Switch mods on and off with a toggle. Every action can be undone."
+      },
+      "skins": {
+        "title": "Heroes and 3D",
+        "text": "Hero skins in 3D with ability animations."
+      },
+      "profiles": {
+        "title": "Builds and profiles",
+        "text": "Mod sets and launch settings in one press, and you can share them."
+      },
+      "fixes": {
+        "title": "Diagnostics",
+        "text": "Finds the mod that breaks the game after a patch."
+      }
+    }
+  },
+  "games": {
+    "title": "Games",
+    "soon": "More games soon"
+  },
   "nav": {
     "catalog": "Catalog",
     "library": "Library",
-    "profiles": "Profiles",
+    "profilesAll": "Builds and profiles",
+    "profiles": "Builds",
+    "loadouts": "Profiles",
     "settings": "Settings",
     "downloads": "Downloads",
     "home": "Home",
@@ -271,12 +312,43 @@
     "file_busy": "A file is in use or protected, so it could not be changed. Close the game and other mod managers and try again.",
     "chunks": "This mod is split over several chunk files, so it cannot be switched safely from here."
   },
+  "loadouts": {
+    "title": "Profiles",
+    "subtitle": "A profile is a mod build plus the game launch settings. One press switches both: for example Ranked without skins and with an FPS cap.",
+    "newName": "New profile name",
+    "build": "Build",
+    "noBuild": "No build",
+    "create": "Save profile",
+    "emptyTitle": "No profiles",
+    "empty": "Save the current launch settings and pick a build – the profile appears here.",
+    "toBuilds": "Go to builds",
+    "apply": "Switch on",
+    "update": "Take launch settings from current",
+    "remove": "Delete",
+    "active": "Active",
+    "partBuild": "Mod build",
+    "partConfig": "Launch settings",
+    "modsCount": "mods: {{count}}",
+    "noBuildHint": "Mods stay as they are",
+    "defaultConfig": "Default settings",
+    "created": "Profile “{{name}}” saved.",
+    "applied": "Profile “{{name}}” is on.",
+    "updated": "Profile “{{name}}” updated.",
+    "failed": "Could not switch the profile on.",
+    "windowed": "Windowed",
+    "fullscreen": "Fullscreen",
+    "on": "on",
+    "off": "off",
+    "showFps": "FPS counter",
+    "priority": "High priority",
+    "noSleep": "No background sleep"
+  },
   "profiles": {
     "copyCode": "Copy code",
     "codeCopied": "The code of \"{{name}}\" is copied. Send it to a friend, they paste it into the import field.",
     "codePlaceholder": "Paste a build code (kae1:…)",
     "codeImport": "Import code",
-    "title": "Profiles",
+    "title": "Mod builds",
     "subtitle": "A profile remembers which mods are enabled and in what order. Switching enables and disables installed mods in one action.",
     "newName": "New profile name",
     "create": "Create from current mods",
@@ -463,6 +535,8 @@
     "minimize": "Minimize",
     "maximize": "Maximize",
     "restore": "Restore",
+    "full": "Full screen",
+    "exitFull": "Exit full screen",
     "close": "Close"
   },
   "home": {
@@ -768,16 +842,18 @@
     "wall": "Background picture",
     "wallHint": "Your own image behind the interface. Kept on this computer.",
     "wallErr": "Could not read that file. Pick a PNG, JPG or WebP image.",
+    "wallDrop": "Drop a picture here or click",
+    "wallPresets": "Built-in backgrounds",
+    "presets": {"none": "None", "gradient": "Graphite", "waves": "Waves"},
     "wallPick": "Choose picture",
     "wallChange": "Replace",
     "wallRemove": "Remove",
     "wallDim": "Picture dimming",
     "wallBlur": "Picture blur",
     "theme": "Look",
-    "themeHint": "A set of colours and shapes. Glass looks best with a background picture.",
+    "themeHint": "A set of colours and shapes.",
     "themes": {
       "graphite": "Graphite",
-      "glass": "Glass",
       "deadlock": "Deadlock"
     }
   },
@@ -830,6 +906,13 @@
     "title": "Hero skins",
     "subtitle": "Skins installed for each hero, and how the hero looks in the game right now.",
     "search": "Search heroes",
+    "favorites": "Favourites",
+    "allHeroes": "All heroes",
+    "favHint": "Press the star next to a hero to keep them here",
+    "fav": "Add to favourites",
+    "unfav": "Remove from favourites",
+    "poster": "Hero poster",
+    "posterClose": "Close",
     "default": "Default",
     "defaultText": "The game's own model",
     "wearing": "Wearing",

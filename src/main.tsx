@@ -3,11 +3,14 @@ import ReactDOM from "react-dom/client";
 import "./i18n";
 import "./styles.css";
 import "./themes.css";
+import "./design.css";
 import App from "./App";
 import { isTauri } from "./lib/api";
 import { applyAppearance } from "./lib/appearance";
+import { initSliders } from "./lib/sliders";
 
 applyAppearance();
+initSliders();
 
 // In the native app the window is transparent and the rounded shell is the window.
 if (isTauri) {

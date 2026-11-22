@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { call, type AddonContent, type InstalledMod } from "../../lib/api";
 import { groupTitle, type ForeignGroup } from "../../lib/foreign";
 import type { CachedMod } from "../../lib/modcache";
 import { HEROES, heroOfCode } from "../../lib/heroes";
+import Icon from "../../components/Icons";
 import EmptyState from "../../components/EmptyState";
 import HeroViewer from "./HeroViewer";
 
@@ -86,6 +88,25 @@ export default function Skins({ mods, groups, known, contents, gameFound, onTogg
   }, []);
   const portrait = (name: string) => portraits[name.toLowerCase().replace(/^the /, "").replace(/[^\p{L}\p{N}]/gu, "")];
   const [query, setQuery] = useState("");
+  const [posterOpen, setPosterOpen] = useState(false);
+  // favourite heroes are a personal list kept on this computer
+  const [favs, setFavs] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("kae.favHeroes") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+  const toggleFav = (name: string) =>
+    setFavs((cur) => {
+      const next = cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name];
+      try {
+        localStorage.setItem("kae.favHeroes", JSON.stringify(next));
+      } catch {
+        /* the list lasts until restart */
+      }
+      return next;
+    });
   const [picked, setPicked] = useState<string | null>(null);
   // undefined: what the hero wears now; null: the base game's model; a string: that mod's file
   const [preview, setPreview] = useState<string | null | undefined>(undefined);
@@ -151,22 +172,55 @@ export default function Skins({ mods, groups, known, contents, gameFound, onTogg
       <div className="skins-grid">
         <aside className="skins-heroes block">
           <input className="field" placeholder={t("skins.search")} value={query} onChange={(e) => setQuery(e.target.value)} />
-          <ul>
-            {list.map((h) => {
+          <div className="skins-scroll">
+            <h4 className="skins-group">{t("skins.favorites")}</h4>
+            <ul>
+              {list.filter((h) => favs.includes(h.name)).map((h) => {
               const all = byHero.get(h.name) ?? [];
               const on = all.filter((s) => s.enabled).sort((a, b) => a.slot - b.slot)[0];
+              const fav = favs.includes(h.name);
               return (
-                <li key={h.name}>
+                <li key={h.name} className="skins-li">
                   <button className="skins-hero" aria-current={hero?.name === h.name ? "true" : undefined} onClick={() => pick(h.name)}>
                     {portrait(h.name) ? <img className="skins-hero-ico" src={portrait(h.name)} alt="" loading="lazy" /> : <span className="skins-hero-ico skins-hero-ph" aria-hidden="true">{h.name.slice(0, 1)}</span>}
                     <span className="skins-hero-name">{h.name}</span>
                     <span className="skins-hero-sub">{on ? on.title : t("skins.default")}</span>
                     {all.length > 0 && <span className="rail-badge">{all.length}</span>}
                   </button>
+                  <button type="button" className={`skins-star ${fav ? "is-fav" : ""}`} aria-pressed={fav} aria-label={fav ? t("skins.unfav") : t("skins.fav")} title={fav ? t("skins.unfav") : t("skins.fav")} onClick={() => toggleFav(h.name)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill={fav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m12 3.2 2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8z" />
+                    </svg>
+                  </button>
                 </li>
               );
-            })}
-          </ul>
+              })}
+              {!list.some((h) => favs.includes(h.name)) && <li className="skins-empty">{t("skins.favHint")}</li>}
+            </ul>
+            <h4 className="skins-group">{t("skins.allHeroes")}</h4>
+            <ul>
+              {list.filter((h) => !favs.includes(h.name)).map((h) => {
+              const all = byHero.get(h.name) ?? [];
+              const on = all.filter((s) => s.enabled).sort((a, b) => a.slot - b.slot)[0];
+              const fav = favs.includes(h.name);
+              return (
+                <li key={h.name} className="skins-li">
+                  <button className="skins-hero" aria-current={hero?.name === h.name ? "true" : undefined} onClick={() => pick(h.name)}>
+                    {portrait(h.name) ? <img className="skins-hero-ico" src={portrait(h.name)} alt="" loading="lazy" /> : <span className="skins-hero-ico skins-hero-ph" aria-hidden="true">{h.name.slice(0, 1)}</span>}
+                    <span className="skins-hero-name">{h.name}</span>
+                    <span className="skins-hero-sub">{on ? on.title : t("skins.default")}</span>
+                    {all.length > 0 && <span className="rail-badge">{all.length}</span>}
+                  </button>
+                  <button type="button" className={`skins-star ${fav ? "is-fav" : ""}`} aria-pressed={fav} aria-label={fav ? t("skins.unfav") : t("skins.fav")} title={fav ? t("skins.unfav") : t("skins.fav")} onClick={() => toggleFav(h.name)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill={fav ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+                      <path d="m12 3.2 2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6L3.4 9.5l6-.8z" />
+                    </svg>
+                  </button>
+                </li>
+              );
+              })}
+            </ul>
+          </div>
         </aside>
         <div className="skins-stage">
         <aside className="skins-preview block">
@@ -177,6 +231,73 @@ export default function Skins({ mods, groups, known, contents, gameFound, onTogg
         <section className="skins-center">
           {hero && (
             <>
+              <div className="block skins-head">
+                <div className="skins-head-row">
+                  <h2 className="block-title">{hero.name}</h2>
+                  <button type="button" className="btn btn-sm skins-poster-btn" onClick={() => setPosterOpen(true)}>
+                    {t("skins.poster")}
+                  </button>
+                </div>
+                <p className="note">
+                  {t("skins.wearing")}: <b>{wearing ? wearing.title : t("skins.default")}</b> · {t("skins.count", { count: skins.length })}
+                </p>
+              </div>
+              <div className="block skins-find">
+                <div>
+                  <b>{t("skins.findTitle")}</b>
+                  <p className="note">{t("skins.findText", { name: hero.name })}</p>
+                </div>
+                <button className="btn" onClick={() => onFind(hero.name)}>
+                  {t("skins.findBtn", { name: hero.name })}
+                </button>
+              </div>
+              <div className="skins-list">
+                <div className="skin-card-wrap">
+                  <button className="skin-card" aria-pressed={shown === null} onClick={() => setPreview(null)}>
+                    <span className="skin-thumb skin-thumb-default" />
+                    <b>{t("skins.default")}</b>
+                  </button>
+                  <div className="skin-foot">
+                    <span className="skin-state">{t("skins.defaultText")}</span>
+                  </div>
+                </div>
+                {skins.map((s) => (
+                  <div key={s.key} className={`skin-card-wrap ${s.enabled ? "skin-on" : ""}`}>
+                    <button className="skin-card" aria-pressed={shown === s.file} onClick={() => setPreview(s.file)}>
+                      {s.thumb ? <img className="skin-thumb" src={s.thumb} alt="" loading="lazy" /> : <span className="skin-thumb skin-thumb-default" />}
+                      <b>{s.title}</b>
+                    </button>
+                    <div className="skin-foot">
+                      <span className={`skin-state ${s.enabled ? "skin-state-on" : ""}`}>{s.enabled ? (s === wearing ? t("skins.worn") : t("skins.on")) : t("skins.off")}</span>
+                      <button className="btn btn-sm" onClick={() => toggle(s)}>
+                        {s.enabled ? t("skins.disable") : t("skins.enable")}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {skins.length === 0 && (
+                <p className="note">
+                  {t("skins.none")}{" "}
+                  <button className="link" onClick={onGoCatalog}>
+                    {t("skins.browse")}
+                  </button>
+                </p>
+              )}
+            </>
+          )}
+        </section>
+        </div>
+      </div>
+      {posterOpen && hero && (
+        createPortal(
+        <>
+          <div className="scrim" onClick={() => setPosterOpen(false)} />
+          <div className="modal-wrap" onClick={() => setPosterOpen(false)}>
+            <section className="poster-modal" role="dialog" aria-modal="true" aria-label={hero.name} onClick={(e) => e.stopPropagation()}>
+              <button type="button" className="poster-close" aria-label={t("skins.posterClose")} onClick={() => setPosterOpen(false)}>
+                <Icon name="close" size={18} />
+              </button>
               {(() => {
                 const poster = posters[heroKey(hero.name)];
                 return (
@@ -203,53 +324,12 @@ export default function Skins({ mods, groups, known, contents, gameFound, onTogg
                   </header>
                 );
               })()}
-              <div className="block skins-head">
-                <h2 className="block-title">{hero.name}</h2>
-                <p className="note">
-                  {t("skins.wearing")}: <b>{wearing ? wearing.title : t("skins.default")}</b> · {t("skins.count", { count: skins.length })}
-                </p>
-              </div>
-              <div className="block skins-find">
-                <div>
-                  <b>{t("skins.findTitle")}</b>
-                  <p className="note">{t("skins.findText", { name: hero.name })}</p>
-                </div>
-                <button className="btn" onClick={() => onFind(hero.name)}>
-                  {t("skins.findBtn", { name: hero.name })}
-                </button>
-              </div>
-              <div className="skins-list">
-                <button className="skin-card" aria-pressed={shown === null} onClick={() => setPreview(null)}>
-                  <span className="skin-thumb skin-thumb-default" />
-                  <b>{t("skins.default")}</b>
-                  <span className="note">{t("skins.defaultText")}</span>
-                </button>
-                {skins.map((s) => (
-                  <div key={s.key} className="skin-card-wrap">
-                    <button className="skin-card" aria-pressed={shown === s.file} onClick={() => setPreview(s.file)}>
-                      {s.thumb ? <img className="skin-thumb" src={s.thumb} alt="" loading="lazy" /> : <span className="skin-thumb skin-thumb-default" />}
-                      <b>{s.title}</b>
-                      <span className="note">{s.enabled ? (s === wearing ? t("skins.worn") : t("skins.on")) : t("skins.off")}</span>
-                    </button>
-                    <button className="btn btn-sm" onClick={() => toggle(s)}>
-                      {s.enabled ? t("skins.disable") : t("skins.enable")}
-                    </button>
-                  </div>
-                ))}
-              </div>
-              {skins.length === 0 && (
-                <p className="note">
-                  {t("skins.none")}{" "}
-                  <button className="link" onClick={onGoCatalog}>
-                    {t("skins.browse")}
-                  </button>
-                </p>
-              )}
-            </>
-          )}
-        </section>
-        </div>
-      </div>
+            </section>
+          </div>
+        </>,
+        document.body,
+        )
+      )}
     </div>
   );
 }

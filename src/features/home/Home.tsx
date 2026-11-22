@@ -152,6 +152,29 @@ export default function Home({ installed, groups, known, report, busy, onOpen, o
           </div>
         )}
 
+        {show.hero && (
+          <div className="hot">
+            <h3 className="hot-title">{t("home.popularNow")}</h3>
+            <ul className="hot-list">
+              {(popular ?? []).slice(1, 4).map((m) => (
+                <li key={m.id}>
+                  <button className="hot-row" onClick={() => onOpen(m)}>
+                    {m.thumbnail ? <img src={m.thumbnail} alt="" loading="lazy" decoding="async" /> : <span className="hot-ph">{m.name.slice(0, 1)}</span>}
+                    <span className="hot-name">
+                      <b title={m.name}>{m.name}</b>
+                      <small>{[m.author, m.category].filter(Boolean).join(" · ")}</small>
+                    </span>
+                    <span className="hot-go" aria-hidden="true">
+                      <Icon name="right" size={16} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {popular === null && [0, 1, 2].map((i) => <li key={i} className="hot-row hot-skel" />)}
+            </ul>
+          </div>
+        )}
+
         {show.popular && (
           <div className="popular">
             {heroes.length > 0 && skins && (
@@ -184,6 +207,9 @@ export default function Home({ installed, groups, known, report, busy, onOpen, o
                   <li key={m.id}>
                     <button className="tcard" onClick={() => onOpen(m)}>
                       {m.thumbnail ? <img src={m.thumbnail} alt="" loading="lazy" decoding="async" /> : <span className="tcard-ph">{m.name.slice(0, 1)}</span>}
+                      <span className="tcard-go" aria-hidden="true">
+                        <Icon name="downloads" size={16} />
+                      </span>
                       <span className="tcard-body">
                         <b title={m.name}>{m.name}</b>
                         <small>{m.author}</small>
@@ -242,8 +268,8 @@ export default function Home({ installed, groups, known, report, busy, onOpen, o
                   const up = updateOf(m.id);
                   return (
                     <li key={m.id} className={`mine-row ${m.enabled ? "" : "mine-off"}`}>
-                      <div className="plate plate-sm">
-                        <b>{m.slot != null ? String(m.slot).padStart(2, "0") : "??"}</b>
+                      <div className="plate plate-sm plate-nopic">
+                        <span className="no-pic" aria-hidden>KAE<br />MODS</span>
                       </div>
                       <div className="mine-name">
                         <b>{m.name}</b>
@@ -286,33 +312,30 @@ export default function Home({ installed, groups, known, report, busy, onOpen, o
           {show.stats && (
           <div className="panel panel-stats">
             <h3 className="panel-title">{t("home.stats")}</h3>
-            <ul className="statlist">
+            <div className="ring-card">
+              <svg className="ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+                <circle cx="60" cy="60" r="50" className="ring-track" />
+                <circle cx="60" cy="60" r="50" className="ring-fill" pathLength={100} strokeDasharray={`${total ? Math.round((enabled / total) * 100) : 0} 100`} />
+              </svg>
+              <div className="ring-center">
+                <small>{t("home.ringEnabled")}</small>
+                <b>{total ? `${enabled}/${total}` : "–"}</b>
+              </div>
+            </div>
+            <ul className="stat-pills">
               <li>
-                <div className="stat-line">
-                  <span>{t("home.ringEnabled")}</span>
-                  <b>{total ? `${enabled} / ${total}` : "–"}</b>
-                </div>
-                <div className="stat-bar" aria-hidden="true">
-                  <i style={{ width: `${total ? Math.round((enabled / total) * 100) : 0}%` }} />
-                </div>
+                <small>{t("home.disk")}</small>
+                <b>{formatBytes(disk)}</b>
               </li>
               <li>
-                <div className="stat-line">
-                  <span>{t("home.ringUpToDate")}</span>
-                  <b>{report ? (report.updates.length > 0 ? t("home.uptodate", { count: report.updates.length }) : t("home.allFresh")) : t("home.notChecked")}</b>
-                </div>
+                <small>{t("home.foreign")}</small>
+                <b>{groups.length}</b>
+              </li>
+              <li>
+                <small>{t("home.ringUpToDate")}</small>
+                <b>{report ? (report.updates.length > 0 ? t("home.uptodate", { count: report.updates.length }) : t("home.allFresh")) : t("home.notChecked")}</b>
               </li>
             </ul>
-            <dl className="facts">
-              <div>
-                <dt>{t("home.disk")}</dt>
-                <dd>{formatBytes(disk)}</dd>
-              </div>
-              <div>
-                <dt>{t("home.foreign")}</dt>
-                <dd>{groups.length}</dd>
-              </div>
-            </dl>
           </div>
           )}
         </aside>
