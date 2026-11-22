@@ -81,21 +81,11 @@ fn decode_material_previews(
             let mut handles = Vec::new();
             for (material_path, properties) in materials.by_ref().take(PREVIEW_WORKERS) {
                 let texture_path = properties.color_texture.clone();
-                // The engine's built-in default textures are not always shipped as files; a material that
-                // only names one (a mask-only mesh such as a glowing star) still has to be drawn.
-                let Some(resource) = cached_texture_resource(archive, &mut raw_cache, &texture_path)
-                    .or_else(|| {
-                        texture_path
-                            .starts_with("materials/default/")
-                            .then(|| {
-                                cached_texture_resource(
-                                    archive,
-                                    &mut raw_cache,
-                                    "materials/default/default_color_tga_22e6f7.vtex_c",
-                                )
-                            })
-                            .flatten()
-                    })
+                // A material whose colour texture is not a file (the engine's built-in default) keeps the
+                // exporter's plain fallback material, which draws a mask-only mesh such as a glowing star as a
+                // solid light shape; substituting a texture would cut it out through its alpha.
+                let Some(resource) =
+                    cached_texture_resource(archive, &mut raw_cache, &texture_path)
                 else {
                     continue;
                 };

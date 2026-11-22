@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "./Icons";
 import { useExit } from "../lib/motion";
 
-export type Option = { value: string; label: string; /** Small round picture shown before the label (a hero portrait). */ icon?: string };
+export type Option = {
+  value: string;
+  label: string;
+  /** Small round picture shown before the label (a hero portrait). */
+  icon?: string;
+  /** Heading shown above the first option of a run with this group. */
+  group?: string;
+};
 
 type Props = {
   value: string;
@@ -193,21 +200,27 @@ export default function Select({ value, options, onChange, label, disabled, clas
           <ul ref={menu} id={id} role="listbox" aria-label={label} className="select-list">
             {shown.length === 0 && <li className="select-none">—</li>}
             {shown.map((o, i) => (
-              <li
-                key={o.value}
-                role="option"
-                aria-selected={o.value === value}
-                data-active={i === active}
-                className="select-opt"
-                onPointerEnter={() => setActive(i)}
-                onClick={() => pick(i)}
-              >
-                <span className="sel-label">
-                  {o.icon && <img className="sel-ico" src={o.icon} alt="" loading="lazy" />}
-                  {o.label}
-                </span>
-                {o.value === value && <Icon name="check" size={16} />}
-              </li>
+              <Fragment key={o.value}>
+                {o.group && o.group !== shown[i - 1]?.group && (
+                  <li role="presentation" className="select-group">
+                    {o.group}
+                  </li>
+                )}
+                <li
+                  role="option"
+                  aria-selected={o.value === value}
+                  data-active={i === active}
+                  className="select-opt"
+                  onPointerEnter={() => setActive(i)}
+                  onClick={() => pick(i)}
+                >
+                  <span className="sel-label">
+                    {o.icon && <img className="sel-ico" src={o.icon} alt="" loading="lazy" />}
+                    {o.label}
+                  </span>
+                  {o.value === value && <Icon name="check" size={16} />}
+                </li>
+              </Fragment>
             ))}
           </ul>
           </div>,

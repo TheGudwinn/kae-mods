@@ -13,6 +13,8 @@ export type ViewerCfg = {
   smaa: boolean;
   /** Glow on strongly self-lit parts. */
   glow: boolean;
+  /** The toon outline the game draws around NPR materials. */
+  outlines: boolean;
   light: LightPreset;
   /** 0.5 to 1.8: scales every light. */
   exposure: number;
@@ -20,15 +22,15 @@ export type ViewerCfg = {
   fov: number;
 };
 
-export const DEFAULT_CFG: ViewerCfg = { wire: false, floor: true, gizmo: true, spin: false, bg: "dark", smaa: true, glow: true, light: "studio", exposure: 1, fov: 35 };
+export const DEFAULT_CFG: ViewerCfg = { wire: false, floor: true, gizmo: true, spin: false, bg: "dark", smaa: true, glow: true, outlines: true, light: "studio", exposure: 1, fov: 35 };
 
 export const BG_COLOR: Record<Bg, number> = { dark: 0x09090b, slate: 0x1b1b1e, light: 0xd9dce2 };
 
 /** Light intensities per preset: [environment, key, rim, fill]. */
 export const LIGHTS: Record<LightPreset, [number, number, number, number]> = {
-  studio: [1, 1.1, 0.6, 0.35],
-  soft: [1.5, 0.5, 0.3, 0.6],
-  dramatic: [0.3, 1.9, 1.3, 0.1],
+  studio: [1, 2.6, 1.2, 2.4],
+  soft: [1.5, 1.4, 0.6, 3.2],
+  dramatic: [0.3, 3.6, 2.4, 0.8],
 };
 
 const KEY = "kea.viewer";
@@ -48,6 +50,7 @@ export function loadCfg(): ViewerCfg {
       bg: pick(o.bg, ["dark", "slate", "light"], DEFAULT_CFG.bg),
       smaa: bool(o.smaa, DEFAULT_CFG.smaa),
       glow: bool(o.glow, DEFAULT_CFG.glow),
+      outlines: bool(o.outlines, DEFAULT_CFG.outlines),
       light: pick(o.light, ["studio", "soft", "dramatic"], DEFAULT_CFG.light),
       exposure: num(o.exposure, 0.5, 1.8, DEFAULT_CFG.exposure),
       fov: num(o.fov, 20, 70, DEFAULT_CFG.fov),

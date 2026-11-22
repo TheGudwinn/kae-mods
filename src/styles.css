@@ -2360,6 +2360,14 @@ input[type="checkbox"]:disabled {
   white-space: nowrap;
   transition: background 100ms linear;
 }
+.select-group {
+  padding: 10px 12px 4px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.55;
+  pointer-events: none;
+}
 .select-opt[data-active="true"] {
   background: rgb(255 255 255 / 0.063);
 }
@@ -5914,4 +5922,21 @@ details summary {
 }
 ::view-transition-old(grain) {
   display: none;
+}
+
+.vw-busy-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: vw-pulse 0.9s ease-in-out infinite alternate;
+}
+@keyframes vw-pulse {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
 }

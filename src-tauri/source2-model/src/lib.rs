@@ -451,6 +451,41 @@ fn idle_clip_path(base: &VpkArchive, entry_path: &str) -> Result<Option<String>>
     Ok(None)
 }
 
+/// Stand a decoded model in the first frame of the game's idle clip and keep it still: no animation is
+/// embedded. The animation of the viewer is decoded separately, as bone tracks, and played on top of this pose.
+pub fn pose_model_still(model: ModelGlb, base: &VpkArchive, skin: &VpkArchive, entry_path: &str) -> ModelGlb {
+    match try_pose_still(&model, base, skin, entry_path) {
+        Ok(Some(posed)) => posed,
+        Ok(None) => model,
+        Err(error) => {
+            log::warn!("[source2] Could not apply the rest pose to {entry_path}: {error}");
+            skin.record_preview_error(entry_path, &error);
+            model
+        }
+    }
+}
+
+fn try_pose_still(model: &ModelGlb, base: &VpkArchive, skin: &VpkArchive, entry_path: &str) -> Result<Option<ModelGlb>> {
+    let resource = Resource::parse(skin.extract_entry(entry_path)?)?;
+    let Some(skeleton) = skeleton::parse_model_skeleton(&resource)? else {
+        return Ok(None);
+    };
+    let mut pose = match idle_clip_path(base, entry_path)? {
+        Some(clip_path) => {
+            let animation = nm_anim::load_nm_animation_from_archive(skin, &clip_path)
+                .inspect_err(|error| skin.record_preview_error(&clip_path, error))?;
+            let frame = animation.sample_frame(0)?;
+            nm_anim::retarget_nm_pose(&animation, &frame, &skeleton)
+        }
+        None => match rest_pose::menu_pose(base, entry_path, &skeleton)? {
+            Some(pose) => pose,
+            None => return Ok(None),
+        },
+    };
+    skeleton.pin_procedural_cloth_roots(&mut pose);
+    vmesh::pose_model_glb(model, &skeleton, &pose).map(Some)
+}
+
 fn try_pose_model_at_rest(
     model: &ModelGlb,
     base: &VpkArchive,

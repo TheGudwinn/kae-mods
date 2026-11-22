@@ -49,7 +49,6 @@ export const HEROES: Hero[] = [
   { name: "Vyper", codes: ["viper", "vyper"] },
   { name: "Warden", codes: ["warden"] },
   { name: "Wraith", codes: ["wraith"] },
-  { name: "Wrecker", codes: ["butcher", "wrecker"] },
   { name: "Yamato", codes: ["yamato"] },
 ];
 

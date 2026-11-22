@@ -821,8 +821,10 @@ pub fn model_mesh_bone_remap(res: &Resource, mesh_index: usize) -> Result<Option
         .map(|value| {
             value
                 .as_i64()
+                // -1 marks a slot no bone uses; it points at the root instead of failing the whole model
+                .map(|value| value.max(0))
                 .and_then(|value| u16::try_from(value).ok())
-                .ok_or_else(|| Source2Error::Resource("bone remap value is not u16".into()))
+                .ok_or_else(|| Source2Error::Resource(format!("bone remap value is not u16: {value:?}")))
         })
         .collect::<Result<Vec<_>>>()
         .map(Some)

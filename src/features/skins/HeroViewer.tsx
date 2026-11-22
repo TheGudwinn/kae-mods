@@ -12,6 +12,10 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { call } from "../../lib/api";
 import Icon from "../../components/Icons";
 import Select from "../../components/Select";
+import { installAnimatedMaterials, type AnimatedMaterials } from "./render/animatedMaterials";
+import { attachNprOutlines } from "./render/nprOutline";
+import { createPreviewClip, type PreviewAnimation } from "./render/previewAnimation";
+import { assignAbilitySlots, type PreviewAnimationChoice } from "./render/previewActions";
 import { BG_COLOR, DEFAULT_CFG, LIGHTS, loadCfg, saveCapture, storeCfg, type Bg, type LightPreset, type ViewerCfg } from "./viewerConfig";
 
 type Props = { hero: string; codes: string[]; addon: string | null };
@@ -20,11 +24,11 @@ type Props = { hero: string; codes: string[]; addon: string | null };
 const cache = new Map<string, ArrayBuffer>();
 const KEEP = 4;
 
-async function fetchModel(hero: string, codes: string[], addon: string | null, clip: string | null): Promise<ArrayBuffer> {
-  const key = `${hero}|${codes[0]}|${addon ?? ""}|${clip ?? ""}`;
+async function fetchModel(hero: string, codes: string[], addon: string | null): Promise<ArrayBuffer> {
+  const key = `${hero}|${codes[0]}|${addon ?? ""}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const raw = await call<ArrayBuffer | number[]>("hero_model", { hero, codes, addon, clip });
+  const raw = await call<ArrayBuffer | number[]>("hero_model", { hero, codes, addon });
   const buf = raw instanceof ArrayBuffer ? raw : new Uint8Array(raw).buffer;
   cache.set(key, buf);
   while (cache.size > KEEP) cache.delete(cache.keys().next().value as string);
@@ -43,16 +47,18 @@ function disposeTree(root: THREE.Object3D) {
   });
 }
 
-type ShowResult = { groups: BodyGroup[]; clips: string[]; clip: number };
+type ShowResult = { groups: BodyGroup[] };
 type ViewerApi = {
-  show: (buf: ArrayBuffer, keepView?: boolean) => Promise<ShowResult>;
+  /** Null when a newer model was requested while this one was still being prepared. */
+  show: (buf: ArrayBuffer, keepView?: boolean) => Promise<ShowResult | null>;
   reset: () => void;
   choose: (chosen: Record<string, number>) => void;
   configure: (c: ViewerCfg) => void;
   snap: (x: number, y: number) => void;
   shot: () => Promise<Blob | null>;
   stream: () => MediaStream;
-  play: (i: number) => void;
+  /** Plays decoded bone tracks on the model; null returns it to its rest pose. */
+  playTracks: (animation: PreviewAnimation | null) => void;
   setPlaying: (on: boolean) => void;
   seek: (t: number) => void;
   info: () => { time: number; dur: number };
@@ -142,7 +148,6 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
   const [menu, setMenu] = useState<"view" | "studio" | null>(null);
-  const [clips, setClips] = useState<string[]>([]);
   const [playing, setPlaying] = useState(true);
   const [pos, setPos] = useState({ time: 0, dur: 0 });
   const [full, setFull] = useState(false);
@@ -150,10 +155,16 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
   const [secs, setSecs] = useState(0);
   const recorder = useRef<MediaRecorder | null>(null);
   const [note, setNote] = useState("");
-  // the game's own animations of this hero (file stems); `clipName` is the one playing, null for the idle pose
-  const [names, setNames] = useState<string[]>([]);
+  // what the hero can be shown doing (movements and abilities made of the game's clips); `actionId` is the one
+  // playing, null for the rest pose
+  const [choices, setChoices] = useState<PreviewAnimationChoice[]>([]);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [animBusy, setAnimBusy] = useState(false);
+  // bumped each time a model has been put in the scene, so the animation is applied to the model that is there
+  const [shownTick, setShownTick] = useState(0);
   const [abilities, setAbilities] = useState<Ability[]>([]);
-  const [clipName, setClipName] = useState<string | null>(null);
+  // the same abilities in English: clip names are matched against these
+  const [abilitiesEn, setAbilitiesEn] = useState<Ability[]>([]);
   const [soft, setSoft] = useState(false);
   const loaded = useRef<{ hero: string; addon: string | null } | null>(null);
   const [groups, setGroups] = useState<BodyGroup[]>([]);
@@ -170,6 +181,10 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // A filmic curve and strong lights give glossy parts the highlights they have in the game; the final
+    // OutputPass applies this curve to the post-processed frame.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.95;
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x09090b);
@@ -180,29 +195,35 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
     const room = new RoomEnvironment();
     scene.environment = pmrem.fromScene(room, 0.04).texture;
     scene.environmentIntensity = 1;
-    const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8aa0, 0.35);
+    const hemi = new THREE.HemisphereLight(0xe9eef9, 0x242022, 0.35);
     scene.add(hemi);
-    const key = new THREE.DirectionalLight(0xffffff, 1.1);
-    key.position.set(2, 3, 4);
+    const key = new THREE.DirectionalLight(0xfff1dc, 1.1);
+    key.position.set(2.8, 4.2, 3.6);
     scene.add(key);
-    const rim = new THREE.DirectionalLight(0xdfe6ff, 0.6);
-    rim.position.set(-3, 2, -3);
+    const rim = new THREE.DirectionalLight(0xff4965, 0.6);
+    rim.position.set(-3.5, 2.4, -2.4);
     scene.add(rim);
-    // glow only for strongly self-lit parts (threshold well above anything a lit surface reaches), so bright clothes never get a halo
-    const composer = new EffectComposer(renderer);
+    // The scene is drawn in HDR (with a stencil buffer for the outlines) and blooms only what is brighter than
+    // white: self-lit material, whose glTF emissive strength runs past 1. Tone mapping happens once, in the output pass.
+    const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, stencilBuffer: true }));
     composer.addPass(new RenderPass(scene, camera));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.25, 0.3, 2.5);
+    const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.3, 0.3, 1.2);
     composer.addPass(bloom);
     composer.addPass(new OutputPass());
     // the composer's targets have no multisampling of their own, so edges are smoothed as a last pass
     const smaa = new SMAAPass(1, 1);
     composer.addPass(smaa);
     let grid: THREE.GridHelper | null = null;
-    let clipList: THREE.AnimationClip[] = [];
+    let restPose: { bone: THREE.Bone; position: THREE.Vector3; quaternion: THREE.Quaternion; scale: THREE.Vector3 }[] = [];
     let action: THREE.AnimationAction | null = null;
     let live: ViewerCfg = cfgRef.current;
     let hits: { x: number; y: number; dir: THREE.Vector3 }[] = [];
-    let rims: THREE.Mesh[] = [];
+    // the game's own material animation (scrolling, jitter, translucency, self-illumination) and the toon outline
+    let animated: AnimatedMaterials | null = null;
+    let outlines: ReturnType<typeof attachNprOutlines> | null = null;
+    let simTime = 0;
+    let running = true;
+    let showTicket = 0;
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     let model: THREE.Object3D | null = null;
@@ -218,6 +239,7 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
       composer.setSize(w, h);
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      outlines?.setViewportHeight(h);
     };
     const ro = new ResizeObserver(resize);
     ro.observe(el);
@@ -277,8 +299,10 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
     const loop = () => {
       raf = requestAnimationFrame(loop);
       controls.update();
-      mixer?.update(Math.min(clock.getDelta(), 0.1));
-      for (const r of rims) r.visible = (r.userData.of as THREE.Mesh).visible;
+      const dt = Math.min(clock.getDelta(), 0.1);
+      mixer?.update(dt);
+      if (running) simTime += dt;
+      animated?.update(simTime);
       composer.render();
       if (live.gizmo) drawGizmo();
     };
@@ -292,6 +316,7 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
       hemi.intensity = f * c.exposure;
       bloom.enabled = c.glow;
       smaa.enabled = c.smaa;
+      outlines?.setVisible(c.outlines);
       (scene.background as THREE.Color).set(BG_COLOR[c.bg]);
       if (camera.fov !== c.fov) {
         camera.fov = c.fov;
@@ -337,14 +362,26 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
         return new Promise((res) => renderer.domElement.toBlob(res, "image/png"));
       },
       stream: () => renderer.domElement.captureStream(30),
-      play: (i) => {
-        if (!mixer || !clipList[i]) return;
+      playTracks: (animation) => {
+        if (!model || !mixer) return;
         action?.stop();
-        action = mixer.clipAction(clipList[i]);
-        action.reset().setLoop(THREE.LoopRepeat, Infinity).play();
+        action = null;
+        mixer.stopAllAction();
+        // the bones go back to the still pose the model was loaded in
+        for (const r of restPose) {
+          r.bone.position.copy(r.position);
+          r.bone.quaternion.copy(r.quaternion);
+          r.bone.scale.copy(r.scale);
+        }
+        if (!animation) return;
+        action = mixer.clipAction(createPreviewClip(model, animation));
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.reset().play();
+        mixer.timeScale = running ? 1 : 0;
         clock.getDelta();
       },
       setPlaying: (on) => {
+        running = on;
         if (mixer) mixer.timeScale = on ? 1 : 0;
       },
       seek: (t) => {
@@ -357,7 +394,18 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
       },
       info: () => ({ time: action?.time ?? 0, dur: action?.getClip().duration ?? 0 }),
       show: async (buf, keepView) => {
+        // Preparing a model takes several awaits; when the hero is switched meanwhile, only the newest request
+        // may touch the scene, or an older hero drawn late replaces the one that was asked for.
+        const ticket = ++showTicket;
         const gltf = await new GLTFLoader().parseAsync(buf.slice(0), "");
+        if (ticket !== showTicket) {
+          disposeTree(gltf.scene);
+          return null;
+        }
+        animated?.dispose();
+        animated = null;
+        outlines?.dispose();
+        outlines = null;
         if (model) {
           scene.remove(model);
           disposeTree(model);
@@ -372,55 +420,37 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
           grid = null;
         }
         model = gltf.scene;
-        // double-sided: the game's models rely on shaders for what a plain material cannot draw
-        model.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (!m.isMesh) return;
-          for (const mat of Array.isArray(m.material) ? m.material : [m.material]) {
-            mat.side = THREE.DoubleSide;
-            // Mods often ship no metal map, and the fallback reads as fully metallic: without the game's own
-            // shaders that draws the model black. Characters are matte; keep the roughness map only.
-            const std = mat as THREE.MeshStandardMaterial;
-            if (std.isMeshStandardMaterial) {
-              std.metalnessMap = null;
-              std.metalness = 0;
-            }
-          }
-        });
-        // Effect cards (flying paper, debris, shields) are cut out and animated by the game's own shaders
-        // (jittered vertices, scrolling translucency masks). A plain material draws them as solid slabs that
-        // cover the hero, so they are left out of the preview.
-        const cards: THREE.Object3D[] = [];
-        model.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (!m.isMesh || Array.isArray(m.material)) return;
-          const mat = m.material as THREE.Material;
-          const fx = (mat.userData as { source2Effect?: { flags?: Record<string, number> } }).source2Effect;
-          if (fx?.flags?.F_JITTER_VERTICES && (mat.alphaTest > 0 || mat.transparent)) cards.push(m);
-        });
-        for (const c of cards) c.removeFromParent();
+        // The model is drawn as the exporter describes it (sidedness, blending, emissive strength); the game's
+        // own material animation and the toon outline are layered on top, as Deadlock Mod Manager does.
+        simTime = 0;
+        const installed = await installAnimatedMaterials(model, (index) => gltf.parser.getDependency("texture", index));
+        if (ticket !== showTicket) {
+          installed.dispose();
+          disposeTree(gltf.scene);
+          if (model === gltf.scene) model = null;
+          return null;
+        }
+        animated = installed;
+        if (animated.diagnostics.length > 0) console.warn("hero materials", animated.diagnostics);
+        outlines = attachNprOutlines(model);
+        outlines.setViewportHeight(Math.max(el.clientHeight, 1));
+        outlines.setVisible(live.outlines);
         scene.add(model);
-        rims = [];
         const read = readGroups(model);
         table.current = read.groups;
         applyGroups(model, read.groups, read.chosen);
-        // the idle animation of the hero is played first, when the model carries one
-        clipList = gltf.animations;
-        const idle = Math.max(0, clipList.findIndex((a) => /idle/i.test(a.name)));
-        if (clipList.length > 0) {
-          mixer = new THREE.AnimationMixer(model);
-          action = mixer.clipAction(clipList[idle]);
-          action.setLoop(THREE.LoopRepeat, Infinity).play();
-          clock.getDelta();
-        }
+        // The model stands in a still pose; the animation chosen in the viewer is decoded as bone tracks and
+        // played on top of it, so the pose the bones start from is kept to return to.
+        mixer = new THREE.AnimationMixer(model);
+        restPose = [];
+        model.traverse((o) => {
+          if ((o as THREE.Bone).isBone) restPose.push({ bone: o as THREE.Bone, position: o.position.clone(), quaternion: o.quaternion.clone(), scale: o.scale.clone() });
+        });
         setChosen(read.chosen);
         const box = new THREE.Box3().setFromObject(model);
         const size = box.getSize(new THREE.Vector3());
         const mid = box.getCenter(new THREE.Vector3());
         const r = Math.max(size.x, size.y, size.z) || 1;
-        // No outline copies: the inflated back-face shells z-fight with the double-sided model and show up as
-        // white/red speckles and stray spikes on many skins.
-        rims = [];
         const dist = (r / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.25;
         // the game's models face +X: look at the hero from the front, slightly to one side and above
         const dir = new THREE.Vector3(0.88, 0.12, 0.46).normalize();
@@ -438,7 +468,7 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
         gm.opacity = 0.22;
         scene.add(grid);
         configure(live);
-        return { groups: read.groups, clips: clipList.map((a, i) => a.name || "#" + (i + 1)), clip: idle };
+        return { groups: read.groups };
       },
       choose: (c) => model && applyGroups(model, table.current, c),
     };
@@ -449,6 +479,8 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
       cancelAnimationFrame(raf);
       ro.disconnect();
       controls.dispose();
+      animated?.dispose();
+      outlines?.dispose();
       composer.dispose();
       if (model) disposeTree(model);
       scene.environment?.dispose();
@@ -463,20 +495,20 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
   useEffect(() => {
     if (!ready) return;
     let stale = false;
-    // changing the animation of the model that is already shown keeps the camera and the veil away
+    // switching to another skin of the hero that is already shown keeps the camera and the veil away
     const same = loaded.current?.hero === hero && loaded.current.addon === addon;
-    const clipNow = same ? clipName : null;
-    if (!same && clipName !== null) setClipName(null);
     setSoft(same);
     setState("loading");
-    fetchModel(hero, codes, addon, clipNow)
-      .then((buf) => api.current?.show(buf, same))
+    fetchModel(hero, codes, addon)
+      // an answer that arrives after the hero was switched again is dropped before it reaches the scene
+      .then((buf) => (stale ? null : api.current?.show(buf, same)))
       .then((res) => {
         if (stale) return;
         loaded.current = { hero, addon };
         setGroups(res?.groups ?? []);
-        setClips(res?.clips ?? []);
         setPlaying(true);
+        api.current?.setPlaying(true);
+        setShownTick((n) => n + 1);
         setSoft(false);
         setState("ready");
       })
@@ -488,19 +520,58 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
     return () => {
       stale = true;
     };
-  }, [hero, addon, ready, clipName]);
+  }, [hero, addon, ready]);
 
+  // what the hero can do: its abilities in English first (clip names are matched against them), then the
+  // movements and abilities the game's clips make up; the idle movement plays by default
   useEffect(() => {
     let stale = false;
-    setNames([]);
-    call<string[]>("hero_clips", { hero }).then(
-      (r) => !stale && setNames(r ?? []),
-      () => {},
-    );
+    setChoices([]);
+    setActionId(null);
+    setAbilitiesEn([]);
+    (async () => {
+      const en = await call<Ability[]>("hero_abilities", { hero, lang: "english" }).catch(() => [] as Ability[]);
+      if (stale) return;
+      setAbilitiesEn(en ?? []);
+      const list = await call<PreviewAnimationChoice[]>("hero_animations", { hero, abilityNames: (en ?? []).map((a) => a.name) }).catch(() => [] as PreviewAnimationChoice[]);
+      if (stale) return;
+      setChoices(list ?? []);
+      setActionId((list ?? []).some((c) => c.id === "idle") ? "idle" : null);
+    })();
     return () => {
       stale = true;
     };
   }, [hero]);
+
+  // the chosen action is decoded as bone tracks and played on the model that is in the scene; a choice that is
+  // switched away from before its tracks arrive is dropped
+  useEffect(() => {
+    if (!ready || shownTick === 0) return;
+    const choice = actionId ? choices.find((c) => c.id === actionId) : undefined;
+    if (!choice) {
+      api.current?.playTracks(null);
+      setAnimBusy(false);
+      return;
+    }
+    let stale = false;
+    setAnimBusy(true);
+    call<PreviewAnimation>("hero_animation", { hero, codes, addon, clipPaths: choice.clips }).then(
+      (a) => {
+        if (stale) return;
+        api.current?.playTracks(a);
+        setAnimBusy(false);
+      },
+      (e) => {
+        if (stale) return;
+        console.error("hero animation", e);
+        api.current?.playTracks(null);
+        setAnimBusy(false);
+      },
+    );
+    return () => {
+      stale = true;
+    };
+  }, [ready, shownTick, actionId, choices, hero, addon]);
 
   // the four abilities of the hero: name in the app's language, icon, and the animation that shows each one
   useEffect(() => {
@@ -528,13 +599,13 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
 
   // timeline position, read from the player a few times a second
   useEffect(() => {
-    if (!ready || clips.length === 0) return;
+    if (!ready || choices.length === 0) return;
     const id = window.setInterval(() => {
       const i = api.current?.info();
       if (i) setPos((p) => (Math.abs(p.time - i.time) < 0.01 && p.dur === i.dur ? p : i));
     }, 90);
     return () => window.clearInterval(id);
-  }, [ready, clips.length]);
+  }, [ready, choices.length]);
 
   useEffect(() => {
     const on = () => setFull(document.fullscreenElement === view.current);
@@ -612,7 +683,19 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
     else void view.current?.requestFullscreen().catch(() => {});
   };
 
-  const pickClip = (v: string) => setClipName(v === "" ? null : v);
+  const pickAction = (v: string) => setActionId(v === "" ? null : v);
+  // each ability of the hero with the action that animates it; actions no slot claimed are still listed
+  const slots = assignAbilitySlots(choices, abilitiesEn.map((a) => ({ className: a.class, name: a.name }))).slots;
+  const idleId = choices.some((c) => c.id === "idle") ? "idle" : null;
+  const abilityLabel = (c: PreviewAnimationChoice) => {
+    const i = slots.findIndex((s) => s.action?.id === c.id);
+    return (i >= 0 ? abilities[i]?.name : undefined) ?? clipLabel(c.id.replace(/^ability:/, ""), ru);
+  };
+  const actionOptions = [
+    { value: "", label: t("skins.vw.restPose") },
+    ...choices.filter((c) => c.kind === "movement").map((c) => ({ value: c.id, label: clipLabel(c.id, ru), group: t("skins.vw.movement") })),
+    ...choices.filter((c) => c.kind === "ability").map((c) => ({ value: c.id, label: abilityLabel(c), group: t("skins.vw.abilityGroup") })),
+  ];
   const togglePlay = () => {
     const next = !playing;
     setPlaying(next);
@@ -679,6 +762,7 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
           <Pick label={t("skins.vw.light")} value={cfg.light} options={LIGHT_KEYS.map((b) => ({ value: b, label: t("skins.vw.light_" + b) }))} onChange={(v) => up({ light: v as LightPreset })} />
           <Slide label={t("skins.vw.exposure")} min={0.5} max={1.8} step={0.05} value={cfg.exposure} fmt={(v) => v.toFixed(2)} onChange={(v) => up({ exposure: v })} />
           <Row label={t("skins.vw.glow")} on={cfg.glow} onChange={(v) => up({ glow: v })} />
+          <Row label={t("skins.vw.outlines")} on={cfg.outlines} onChange={(v) => up({ outlines: v })} />
           <button className="btn btn-sm vw-reset" onClick={() => setCfg(DEFAULT_CFG)}>
             {t("skins.vw.defaults")}
           </button>
@@ -740,14 +824,16 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
 
       {abilities.length > 0 && (ready2 || soft) && (
         <div className="vw-slots" role="group" aria-label={t("skins.vw.abilities")}>
-          {abilities.map((a, i) => (
+          {abilities.map((a, i) => {
+            const act = slots[i]?.action ?? null;
+            return (
             <button
               key={a.class}
               className="vw-slot"
-              aria-pressed={a.clip !== null && clipName === a.clip}
-              disabled={!a.clip}
-              title={a.clip ? a.name : t("skins.vw.noClip", { name: a.name })}
-              onClick={() => a.clip && pickClip(clipName === a.clip ? "" : a.clip)}
+              aria-pressed={act !== null && actionId === act.id}
+              disabled={!act}
+              title={act ? a.name : t("skins.vw.noClip", { name: a.name })}
+              onClick={() => act && pickAction(actionId === act.id ? (idleId ?? "") : act.id)}
             >
               <span className="vw-slot-box">
                 {a.icon ? <img src={a.icon} alt="" loading="lazy" draggable={false} /> : <b>{i + 1}</b>}
@@ -755,16 +841,18 @@ export default function HeroViewer({ hero, codes, addon }: Props) {
               </span>
               <span className="vw-slot-name">{a.name}</span>
             </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {(clips.length > 0 || names.length > 0) && (ready2 || soft) && (
+      {choices.length > 0 && (ready2 || soft) && (
         <div className="vw-anim">
           <button className="vw-play" aria-label={playing ? t("skins.vw.pause") : t("skins.vw.play")} onClick={togglePlay}>
             <Icon name={playing ? "pause" : "play"} size={16} />
           </button>
-          <Select className="vw-clip" label={t("skins.vw.clip")} value={clipName ?? ""} onChange={pickClip} options={[{ value: "", label: t("skins.vw.idle") }, ...names.map((n) => ({ value: n, label: clipLabel(n, ru) }))]} />
+          <Select className="vw-clip" label={t("skins.vw.clip")} value={actionId ?? ""} onChange={pickAction} options={actionOptions} />
+          {animBusy && <span className="vw-busy-dot" aria-hidden="true" />}
           <span className="vw-time">{clock2(pos.time)}</span>
           <input
             className="vw-scrub"

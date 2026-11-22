@@ -963,6 +963,7 @@
       "light_dramatic": "Contrast",
       "exposure": "Brightness",
       "glow": "Glow",
+      "outlines": "Outlines",
       "defaults": "Reset settings",
       "shot": "Screenshot",
       "record": "Record video",
@@ -980,6 +981,9 @@
       "busy": "Loading the animation…",
       "abilities": "Abilities",
       "idle": "Idle",
+      "restPose": "Rest pose",
+      "movement": "Movement",
+      "abilityGroup": "Abilities",
       "noClip": "{{name}}: the game has no separate animation for it"
     }
   },

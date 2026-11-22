@@ -60,6 +60,8 @@ pub fn run() {
             commands::list_categories,
             commands::hero_portraits,
             commands::hero_model,
+            commands::hero_animations,
+            commands::hero_animation,
             commands::enqueue_install,
             commands::list_queue,
             commands::pause_download,

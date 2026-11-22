@@ -83,7 +83,8 @@ pub struct Content {
     pub kinds: Vec<KindCount>,
     /// Heroes the files belong to, most files first (at most 4).
     pub heroes: Vec<HeroHit>,
-    /// Heroes whose own model (`models/heroes*/<hero>/*.vmdl_c`) the files replace: the real skins. Voice packs,
+    /// Heroes whose own model (`models/heroes*/<hero>/*.vmdl_c`), or its materials and textures, the files replace:
+    /// the real skins. Voice packs,
     /// particles and card art also name a hero, but do not change how it looks.
     pub model_heroes: Vec<HeroHit>,
     /// Up to `SAMPLE` paths, sorted, so the user can see what is inside.
@@ -181,7 +182,10 @@ pub fn describe(files: &[VpkFile]) -> Content {
         *folders.entry(top.to_ascii_lowercase()).or_default() += 1;
         match hero_of(&f.path) {
             Some((h, true)) => {
-                if f.path.to_ascii_lowercase().starts_with("models/heroes") && f.path.to_ascii_lowercase().ends_with(".vmdl_c") {
+                // a model, or the materials and textures of the hero's model (a texture-only skin has no model)
+                let lower = f.path.to_ascii_lowercase();
+                let hero_folder = lower.starts_with("models/heroes") || lower.starts_with("materials/models/heroes");
+                if hero_folder && [".vmdl_c", ".vmat_c", ".vtex_c"].iter().any(|ext| lower.ends_with(ext)) {
                     *modeled.entry(h.clone()).or_default() += 1;
                 }
                 *strong.entry(h).or_default() += 1
@@ -235,6 +239,15 @@ mod tests {
         assert_eq!(kind_of("maps/dl_midtown.vpk"), Kind::Maps);
         assert_eq!(kind_of("weird/a.vtex_c"), Kind::Textures, "unknown folder falls back to the extension");
         assert_eq!(kind_of("readme.txt"), Kind::Other);
+    }
+
+    #[test]
+    fn a_texture_only_skin_counts_as_a_skin() {
+        let c = describe(&[f("models/heroes_wip/dynamo/materials/dynamo_clothes_color_png_8f9257e5.vtex_c", 16_000_000)]);
+        assert_eq!(c.model_heroes.iter().map(|h| h.code.as_str()).collect::<Vec<_>>(), ["dynamo"]);
+        // voice and card art still do not
+        let v = describe(&[f("sounds/vo/dynamo/a.vsnd_c", 10), f("panorama/images/heroes/dynamo_card.vtex_c", 10)]);
+        assert!(v.model_heroes.is_empty());
     }
 
     #[test]
