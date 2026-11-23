@@ -858,7 +858,7 @@ select.field option {
   bottom: 28px;
   z-index: 30;
   width: min(380px, calc(100vw - 56px));
-  background: rgb(22 19 50 / 0.92);
+  background: var(--ink-2, #222326);
   border: 1px solid var(--edge-hi);
   border-radius: var(--r-card);
   padding: 14px 18px;

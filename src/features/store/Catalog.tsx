@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { call, type Category, type Mod, type Page, type Sort } from "../../lib/api";
+import { call, type Category, type Mod, type ModDetails, type Page, type Sort } from "../../lib/api";
 import { catClass, compact, humanizeError } from "../../lib/format";
 import Select from "../../components/Select";
 import { heroKey } from "../../lib/portraits";
@@ -24,6 +24,74 @@ function Heart() {
     <svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
       <path d="M8 14.2 2.3 8.6a3.6 3.6 0 0 1 5.1-5.1L8 4.1l.6-.6a3.6 3.6 0 0 1 5.1 5.1L8 14.2Z" />
     </svg>
+  );
+}
+
+/** Screenshots per mod, fetched once on the first hover and kept for the session. */
+const reelCache = new Map<string, Promise<string[]>>();
+const reelOf = (id: string) => {
+  let p = reelCache.get(id);
+  if (!p) {
+    p = call<ModDetails>("mod_details", { id }).then((d) => d.images.slice(0, 6), () => []);
+    reelCache.set(id, p);
+  }
+  return p;
+};
+
+/** Animated preview on a card: while the pointer is over the cover, the mod's screenshots cross-fade one after another. */
+function TileReel({ id }: { id: string }) {
+  const host = useRef<HTMLSpanElement>(null);
+  const [shots, setShots] = useState<string[]>([]);
+  const [on, setOn] = useState(false);
+  const [i, setI] = useState(0);
+
+  useEffect(() => {
+    const el = host.current?.parentElement;
+    if (!el) return;
+    let wait = 0;
+    const enter = () => {
+      wait = window.setTimeout(() => {
+        reelOf(id).then((s) => {
+          if (s.length > 1) {
+            setShots(s);
+            setI(0);
+            setOn(true);
+          }
+        });
+      }, 350);
+    };
+    const leave = () => {
+      window.clearTimeout(wait);
+      setOn(false);
+    };
+    el.addEventListener("pointerenter", enter);
+    el.addEventListener("pointerleave", leave);
+    el.addEventListener("focus", enter);
+    el.addEventListener("blur", leave);
+    return () => {
+      window.clearTimeout(wait);
+      el.removeEventListener("pointerenter", enter);
+      el.removeEventListener("pointerleave", leave);
+      el.removeEventListener("focus", enter);
+      el.removeEventListener("blur", leave);
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (!on || shots.length < 2 || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setI((n) => (n + 1) % shots.length), 1100);
+    return () => window.clearInterval(timer);
+  }, [on, shots]);
+
+  return (
+    <span ref={host} className={`tile-reel ${on ? "on" : ""}`} aria-hidden="true">
+      {on && shots.map((s, n) => <img key={s} src={s} alt="" className={n === i ? "cur" : ""} decoding="async" />)}
+      {on && (
+        <span className="tile-reel-dots">
+          {shots.map((s, n) => <i key={s} className={n === i ? "cur" : ""} />)}
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -305,7 +373,10 @@ export default function Catalog({ installedIds, onOpen, search, preset, onGoSett
                 <li key={m.id} className={`tile ${have ? "tile-have" : ""}`}>
                   <button className="tile-cover tile-cover-btn" onClick={() => onOpen(m)} aria-label={`${t("catalog.details")}: ${m.name}`}>
                     {m.thumbnail ? (
-                      <img className="tile-img" src={m.thumbnail} alt="" loading="lazy" decoding="async" />
+                      <>
+                        <img className="tile-img" src={m.thumbnail} alt="" loading="lazy" decoding="async" />
+                        <TileReel id={m.id} />
+                      </>
                     ) : (
                       <span className="tile-img tile-img-empty" aria-hidden="true">
                         {m.category ?? ""}
