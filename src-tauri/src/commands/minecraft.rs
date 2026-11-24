@@ -315,6 +315,9 @@ fn crash_reason(dir: &std::path::Path) -> (String, String) {
     if text.contains("UnsupportedClassVersionError") || text.contains("compiled by a more recent version of the Java Runtime") {
         return ("java".into(), line("UnsupportedClassVersionError").unwrap_or_default());
     }
+    if text.contains("UnsatisfiedLinkError") || text.contains("Failed to locate library") {
+        return ("natives".into(), line("Failed to locate library").unwrap_or_default());
+    }
     for needle in ["requires", "Incompatible mod set", "Mixin apply failed", "Failed to load mod", "Caused by:"] {
         if let Some(d) = line(needle) {
             return ("mods".into(), d);
@@ -850,4 +853,21 @@ pub async fn mc_import_code(app: AppHandle, state: State<'_, AppState>, code: St
     };
     let failed = cancellable("code", async { catalog::install_code_files(&client, &p, &inst, &c, &report).await }).await?;
     Ok(CodeImport { instance: inst, failed })
+}
+
+#[tauri::command]
+pub async fn mc_project(state: State<'_, AppState>, id: String) -> R<serde_json::Value> {
+    catalog::project_detail(&state.net.client(), &id).await
+}
+
+#[tauri::command]
+pub async fn mc_file_meta(state: State<'_, AppState>, id: String) -> R<Vec<catalog::FileMeta>> {
+    let p = paths(&state);
+    let inst = mc::get_instance(&p, &id)?;
+    catalog::file_meta(&state.net.client(), &p, &inst).await
+}
+
+#[tauri::command]
+pub fn mc_file_meta_cached(state: State<'_, AppState>, id: String) -> Vec<catalog::FileMeta> {
+    catalog::cached_file_meta(&paths(&state), &id)
 }

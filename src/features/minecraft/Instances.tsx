@@ -6,7 +6,7 @@ import Select from "../../components/Select";
 import Icon from "../../components/Icons";
 import GeneralSettings from "./GeneralSettings";
 import Confirm, { type ConfirmState } from "../../components/Confirm";
-import type { Cfg, Common, Instance, McFile, McPage, OpenRequest } from "./Minecraft";
+import type { Cfg, Common, Instance, Launch, McFile, McPage, OpenRequest } from "./Minecraft";
 
 const LOADERS = ["vanilla", "fabric", "quilt", "forge", "neoforge"];
 const SUBS = ["mod", "datapack", "resourcepack", "shader", "world"] as const;
@@ -16,21 +16,30 @@ type Shot = { name: string; size: number; modified: number };
 type LogChunk = { text: string; offset: number; reset: boolean };
 type Update = { kind: string; file: string; new_name: string; version: string };
 type Covers = Record<string, string>;
+type FileMeta = { kind: string; file: string; project: string; title: string; icon: string | null; author: string; more_authors: number; client: string; server: string };
 
 /** The picture of a pack: a colour taken from its id, since an instance has no art of its own. */
 function coverStyle(id: string, uri?: string): React.CSSProperties {
   if (uri) return { backgroundImage: `url(${uri})`, backgroundSize: "cover", backgroundPosition: "center" };
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return { background: `linear-gradient(145deg, hsl(${h} 38% 30%), hsl(${(h + 50) % 360} 42% 16%))` };
+  void id;
+  return { background: "var(--ink-0)" };
 }
 
-const MONOGRAM: Record<string, string> = { vanilla: "MC", fabric: "Fb", quilt: "Qt", forge: "Fg", neoforge: "Nf" };
+/** A pack without its own picture shows the brand, like a game does. */
+function Brand() {
+  return (
+    <span className="mc-cover-letter mc-brand">
+      KAE
+      <br />
+      MODS
+    </span>
+  );
+}
 
 function Cover({ i, big, uri }: { i: Instance; big?: boolean; uri?: string }) {
   return (
     <div className={`mc-cover ${big ? "mc-cover-big" : ""}`} style={coverStyle(i.id, uri)} aria-hidden>
-      {!uri && <span className="mc-cover-letter">{MONOGRAM[i.loader] ?? "MC"}</span>}
+      {!uri && <Brand />}
     </div>
   );
 }
@@ -130,6 +139,29 @@ function Console({ id, running, active }: { id: string; running: boolean; active
     const el = box.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [text]);
+  // the log takes what is left of the window, so the page does not have to be scrolled to reach its end
+  useEffect(() => {
+    if (!active) return;
+    let raf = 0;
+    const fit = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const el = box.current;
+        if (!el) return;
+        const top = el.getBoundingClientRect().top;
+        el.style.height = `${Math.max(220, Math.floor(window.innerHeight - top - 24))}px`;
+      });
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    const ro = new ResizeObserver(fit);
+    ro.observe(document.body);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", fit);
+      ro.disconnect();
+    };
+  }, [active]);
 
   return (
     <div className="mc-console">
@@ -237,63 +269,83 @@ function Options({ inst, onClose, onSaved, fail }: { inst: Instance; onClose: ()
 
   return (
     <Modal title={t("mc.opt.title")} onClose={onClose}>
-      <div className="mc-dialog-body">
-        <label className="mc-lab">{t("mc.opt.name")}</label>
-        <input className="field" value={name} onChange={(e) => setName(e.target.value)} />
+      <div className="mc-dialog-body mc-opt">
+        <section className="mc-sect">
+          <label className="mc-lab" htmlFor="mc-opt-name">
+            {t("mc.opt.name")}
+          </label>
+          <input id="mc-opt-name" className="field" value={name} onChange={(e) => setName(e.target.value)} />
+        </section>
 
-        <h3 className="mc-sub">{t("mc.opt.memory")}</h3>
-        <label className="check">
-          <input type="radio" name="mem" checked={!custom} onChange={() => setCustom(false)} />
-          <span>{t("mc.opt.memDefault", { mb: 4096 })}</span>
-        </label>
-        <label className="check">
-          <input type="radio" name="mem" checked={custom} onChange={() => setCustom(true)} />
-          <span>{t("mc.opt.memCustom")}</span>
-        </label>
-        <div className="mc-row">
-          <input className="mc-range" type="range" min={1024} max={ram ? Math.min(32768, ram) : 32768} step={256} value={mem} disabled={!custom} aria-label={t("mc.opt.memCustom")} onChange={(e) => setMem(Number(e.target.value))} />
-          <input className="field mc-mem" type="number" min={1024} max={65536} step={256} value={mem} disabled={!custom} onChange={(e) => setMem(Number(e.target.value))} />
-          <span className="note">MB</span>
-        </div>
-
-        {ram > 0 && (
-          <p className="note">
-            {t("mc.opt.ramInfo", { ram, advice, mods: modCount })}{" "}
-            <button
-              className="btn btn-quiet"
-              onClick={() => {
-                setCustom(true);
-                setMem(advice);
-              }}
-            >
-              {t("mc.opt.useAdvice", { mb: advice })}
+        <section className="mc-sect">
+          <h3 className="mc-sub">{t("mc.opt.memory")}</h3>
+          <div className="seg" role="radiogroup" aria-label={t("mc.opt.memory")}>
+            <button role="radio" aria-checked={!custom} className={`seg-btn ${!custom ? "seg-on" : ""}`} onClick={() => setCustom(false)}>
+              {t("mc.opt.memDefault", { mb: 4096 })}
             </button>
-          </p>
-        )}
-        {tooMuch && (
-          <p className="mc-warn" role="alert">
-            {t("mc.opt.ramWarn", { ram })}
-          </p>
-        )}
+            <button role="radio" aria-checked={custom} className={`seg-btn ${custom ? "seg-on" : ""}`} onClick={() => setCustom(true)}>
+              {t("mc.opt.memCustom")}
+            </button>
+          </div>
+          <div className="mc-memrow">
+            <input className="mc-range" type="range" min={1024} max={ram ? Math.min(32768, ram) : 32768} step={256} value={mem} disabled={!custom} aria-label={t("mc.opt.memCustom")} onChange={(e) => setMem(Number(e.target.value))} />
+            <span className="mc-memfield">
+              <input className="field" type="number" min={1024} max={65536} step={256} value={mem} disabled={!custom} aria-label="MB" onChange={(e) => setMem(Number(e.target.value))} />
+              <span className="note">MB</span>
+            </span>
+          </div>
+          {ram > 0 && (
+            <div className="mc-advice">
+              <span className="note">{t("mc.opt.ramInfo", { ram, advice, mods: modCount })}</span>
+              <button
+                className="btn btn-quiet"
+                onClick={() => {
+                  setCustom(true);
+                  setMem(advice);
+                }}
+              >
+                {t("mc.opt.useAdvice", { mb: advice })}
+              </button>
+            </div>
+          )}
+          {tooMuch && (
+            <p className="mc-warn" role="alert">
+              {t("mc.opt.ramWarn", { ram })}
+            </p>
+          )}
+        </section>
 
-        <h3 className="mc-sub">{t("mc.opt.advanced")}</h3>
-        {inst.loader !== "vanilla" && (
-          <>
-            <label className="mc-lab">{t("mc.opt.loaderVersion", { loader: t(`mc.loaders.${inst.loader}`) })}</label>
-            <Select label={t("mc.opt.loaderVersion", { loader: "" })} value={lv} onChange={setLv} options={lvOptions.map((v) => ({ value: v, label: v === lvs[0] ? `${v} · ${t("mc.latest")}` : v }))} />
-            {lv && lv !== inst.loader_version && <p className="note">{t("mc.opt.loaderWarn")}</p>}
-          </>
-        )}
-        <label className="mc-lab">{t("mc.opt.java")}</label>
-        <input className="field" value={java} placeholder={t("mc.opt.javaDefault")} onChange={(e) => setJava(e.target.value)} />
-        <label className="mc-lab">{t("mc.opt.args")}</label>
-        <input className="field" value={args} placeholder="-XX:+UseG1GC" onChange={(e) => setArgs(e.target.value)} />
-
-        <label className="check">
-          <input type="checkbox" checked={debug} onChange={(e) => setDebug(e.target.checked)} />
-          <span>{t("mc.opt.debug")}</span>
-        </label>
-        <p className="note">{t("mc.opt.debugHint")}</p>
+        <section className="mc-sect">
+          <h3 className="mc-sub">{t("mc.opt.advanced")}</h3>
+          {inst.loader !== "vanilla" && (
+            <div className="mc-fieldgroup">
+              <span className="mc-lab">{t("mc.opt.loaderVersion", { loader: t(`mc.loaders.${inst.loader}`) })}</span>
+              <Select label={t("mc.opt.loaderVersion", { loader: "" })} value={lv} onChange={setLv} options={lvOptions.map((v) => ({ value: v, label: v === lvs[0] ? `${v} · ${t("mc.latest")}` : v }))} />
+              {lv && lv !== inst.loader_version && <p className="note">{t("mc.opt.loaderWarn")}</p>}
+            </div>
+          )}
+          <div className="mc-fieldgroup">
+            <label className="mc-lab" htmlFor="mc-opt-java">
+              {t("mc.opt.java")}
+            </label>
+            <input id="mc-opt-java" className="field" value={java} placeholder={t("mc.opt.javaDefault")} onChange={(e) => setJava(e.target.value)} />
+          </div>
+          <div className="mc-fieldgroup">
+            <label className="mc-lab" htmlFor="mc-opt-args">
+              {t("mc.opt.args")}
+            </label>
+            <input id="mc-opt-args" className="field" value={args} placeholder="-XX:+UseG1GC" onChange={(e) => setArgs(e.target.value)} />
+          </div>
+          <div className="mc-switchrow">
+            <div className="mc-switchtext">
+              <span className="mc-lab" id="mc-opt-debug">
+                {t("mc.opt.debug")}
+              </span>
+              <p className="note">{t("mc.opt.debugHint")}</p>
+            </div>
+            <button className="switch" role="switch" aria-checked={debug} aria-labelledby="mc-opt-debug" onClick={() => setDebug(!debug)} />
+          </div>
+        </section>
       </div>
       <div className="mc-dialog-foot">
         <button className="btn" onClick={onClose}>
@@ -307,7 +359,7 @@ function Options({ inst, onClose, onSaved, fail }: { inst: Instance; onClose: ()
   );
 }
 
-function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instance) => Promise<void>; back: () => void; share: (i: Instance) => Promise<void>; onGo: (p: McPage) => void; cover?: string; reloadCovers: () => void; initialTab: Tab }) {
+function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instance) => Promise<void>; back: () => void; share: (i: Instance) => Promise<void>; onGo: (p: McPage) => void; onAdd: (id: string) => void; launch: Launch | null; cover?: string; reloadCovers: () => void; initialTab: Tab }) {
   const { t } = useTranslation();
   const { inst, running } = p;
   const [tab, setTab] = useState<Tab>(p.initialTab);
@@ -319,6 +371,7 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
   const [wasRunning, setWasRunning] = useState(running);
   const [updates, setUpdates] = useState<Update[]>([]);
   const [unknown, setUnknown] = useState<string[]>([]);
+  const [meta, setMeta] = useState<Record<string, FileMeta>>({});
   const [packUpdate, setPackUpdate] = useState<{ available: boolean; version: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
@@ -369,6 +422,18 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
 
   const counts = useMemo(() => Object.fromEntries(SUBS.map((s) => [s, files.filter((f) => f.kind === s).length])) as Record<Sub, number>, [files]);
   const shown = files.filter((f) => f.kind === sub);
+  // title, picture, author and where it runs, from Modrinth; the rows show the file name until it arrives
+  const fileCount = files.length;
+  useEffect(() => {
+    let gone = false;
+    const put = (l: FileMeta[]) => !gone && setMeta(Object.fromEntries(l.map((m) => [m.kind + "/" + m.file.replace(/.disabled$/, ""), m])));
+    // the saved answer shows at once, the fresh one replaces it
+    void call<FileMeta[]>("mc_file_meta_cached", { id: inst.id }).then(put, () => {});
+    void call<FileMeta[]>("mc_file_meta", { id: inst.id }).then(put, () => {});
+    return () => {
+      gone = true;
+    };
+  }, [inst.id, fileCount]);
   const act = async (fn: () => Promise<unknown>, after?: () => void) => {
     try {
       await fn();
@@ -468,6 +533,17 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
         <div className="mc-head-main">
           <h2 className="mc-title">{inst.name}</h2>
           <span className="note">{t("mc.myCreation")}</span>
+          {p.launch && (
+            <div className="mc-load" role="status" aria-live="polite">
+              <span className="mc-load-text">{p.launch.text}</span>
+              <span className="mc-load-track" aria-hidden="true">
+                <span className={`mc-load-fill ${p.launch.total ? "" : "mc-load-wait"}`} style={p.launch.total ? { width: `${Math.min(100, Math.round((p.launch.done / p.launch.total) * 100))}%` } : undefined} />
+              </span>
+              <button className="mc-load-x" aria-label={t("mc.cancel")} data-tip={t("mc.cancel")} onClick={() => void call("mc_cancel", { key: p.launch!.id }).catch(() => {})}>
+                <Icon name="close" size={14} />
+              </button>
+            </div>
+          )}
         </div>
         <div className="mc-head-actions">
           {running ? (
@@ -510,7 +586,7 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
                 }}
               >
                 <li>
-                  <button role="menuitem" onClick={() => p.onGo("browse")}>
+                  <button role="menuitem" onClick={() => p.onAdd(inst.id)}>
                     {t("mc.menu.addContent")}
                   </button>
                 </li>
@@ -616,24 +692,32 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
               </button>
             ))}
           </div>
-          {sub !== "world" && sub !== "datapack" && (
+          {sub !== "world" && (
             <div className="mc-row">
-              <button className="btn" disabled={updates.length === 0 || !!updating} onClick={() => void runUpdates(updates)}>
-                <Icon name="down" size={18} />
-                {updating ? t("mc.updating", { name: updating }) : t("mc.updateAll")}
-                {updates.length > 0 && !updating && <span className="mc-count">{updates.length}</span>}
+              {sub !== "datapack" && (
+                <>
+                  <button className="btn" disabled={updates.length === 0 || !!updating} onClick={() => void runUpdates(updates)}>
+                    <Icon name="down" size={18} />
+                    {updating ? t("mc.updating", { name: updating }) : t("mc.updateAll")}
+                    {updates.length > 0 && !updating && <span className="mc-count">{updates.length}</span>}
+                  </button>
+                  <button className="btn btn-icon btn-quiet" aria-label={t("mc.checkUpdates")} data-tip={t("mc.checkUpdates")} disabled={checking || !!updating} onClick={() => void check()}>
+                    <Icon name="spin" size={18} />
+                  </button>
+                  {checking && <span className="note">{t("mc.checking")}</span>}
+                </>
+              )}
+              <button className="btn btn-primary" style={{ marginLeft: "auto" }} onClick={() => p.onAdd(inst.id)}>
+                <Icon name="plus" size={18} />
+                {t("mc.addMods")}
               </button>
-              <button className="btn btn-icon btn-quiet" aria-label={t("mc.checkUpdates")} data-tip={t("mc.checkUpdates")} disabled={checking || !!updating} onClick={() => void check()}>
-                <Icon name="spin" size={18} />
-              </button>
-              {checking && <span className="note">{t("mc.checking")}</span>}
             </div>
           )}
           {shown.length === 0 ? (
             <div className="mc-empty">
               <p className="note">{t("mc.noFiles")}</p>
               {sub !== "world" && (
-                <button className="btn" onClick={() => p.onGo("browse")}>
+                <button className="btn" onClick={() => p.onAdd(inst.id)}>
                   <Icon name="plus" size={18} />
                   {t("mc.menu.addContent")}
                 </button>
@@ -644,8 +728,9 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
               <thead>
                 <tr>
                   <th>{t("mc.col.name")}</th>
-                  <th>{t("mc.col.size")}</th>
                   <th>{t("mc.col.action")}</th>
+                  <th>{t("mc.col.author")}</th>
+                  <th>{t("mc.col.env")}</th>
                   <th>{t("mc.col.active")}</th>
                   <th />
                 </tr>
@@ -654,9 +739,21 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
                 {shown.map((f) => (
                   <tr key={f.kind + f.name} className={f.enabled ? "" : "mc-off"}>
                     <td className="mc-fname" title={f.name}>
-                      {f.kind === "datapack" ? f.name.replace("/", " / ").replace(/\.disabled$/, "") : f.name.replace(/\.disabled$/, "")}
+                      {(() => {
+                        const m = meta[f.kind + "/" + f.name.replace(/.disabled$/, "")];
+                        const plain = f.kind === "datapack" ? f.name.replace("/", " / ").replace(/.disabled$/, "") : f.name.replace(/.disabled$/, "");
+                        const bytes = f.kind === "world" ? "" : f.size >= 1e6 ? `${(f.size / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1e3))} KB`;
+                        return (
+                          <span className="mc-fcell">
+                            {m?.icon ? <img className="mc-fico" src={m.icon} alt="" loading="lazy" /> : <span className="mc-fico" />}
+                            <span className="mc-ftext">
+                              <strong>{m?.title || plain}</strong>
+                              <span className="note">{m?.title ? plain : bytes}</span>
+                            </span>
+                          </span>
+                        );
+                      })()}
                     </td>
-                    <td className="note">{f.kind === "world" ? "" : f.size >= 1e6 ? `${(f.size / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(f.size / 1e3))} KB`}</td>
                     <td>
                       {unknown.includes(`${f.kind}/${f.name}`) && (
                         <span className="note" title={t("mc.unknownHint")}>
@@ -668,6 +765,25 @@ function Detail(p: Common & { inst: Instance; running: boolean; play: (i: Instan
                           {updating === f.name ? t("mc.updatingShort") : t("mc.update")}
                         </button>
                       )}
+                    </td>
+                    <td className="note">
+                      {(() => {
+                        const m = meta[f.kind + "/" + f.name.replace(/.disabled$/, "")];
+                        return m?.author ? `${m.author}${m.more_authors ? ` +${m.more_authors}` : ""}` : "";
+                      })()}
+                    </td>
+                    <td className="mc-env">
+                      {(() => {
+                        const m = meta[f.kind + "/" + f.name.replace(/.disabled$/, "")];
+                        if (!m || f.kind !== "mod") return null;
+                        const side = (v: string) => v !== "unsupported" && v !== "unknown";
+                        return (
+                          <>
+                            {side(m.client) && <span className="mc-chip" title={t("mc.env.client")}>{t("mc.env.clientShort")}</span>}
+                            {side(m.server) && <span className="mc-chip" title={t("mc.env.server")}>{t("mc.env.serverShort")}</span>}
+                          </>
+                        );
+                      })()}
                     </td>
                     <td>
                       {f.kind !== "world" && (
@@ -893,7 +1009,7 @@ function Onboarding(p: Common & { cfg: Cfg | null; onCreate: () => void; onImpor
   );
 }
 
-export default function Instances(p: Common & { running: Record<string, boolean>; play: (i: Instance) => Promise<void>; onGo: (p: McPage) => void; openRequest: OpenRequest | null; onOpened: () => void }) {
+export default function Instances(p: Common & { running: Record<string, boolean>; play: (i: Instance) => Promise<void>; onGo: (p: McPage) => void; openRequest: OpenRequest | null; onOpened: () => void; onDetail: (id: string | null) => void; onAdd: (id: string) => void; launch: Launch | null }) {
   const { t } = useTranslation();
   const { instances, running } = p;
   const [openId, setOpenId] = useState<string | null>(null);
@@ -949,8 +1065,10 @@ export default function Instances(p: Common & { running: Record<string, boolean>
   const openKey = open?.id;
   useEffect(() => {
     if (openKey) p.setSelected(openKey); // the catalog installs into the pack that is open
+    p.onDetail(openKey ?? null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openKey]);
+  useEffect(() => () => p.onDetail(null), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const importPack = async (given?: string) => {
     try {
@@ -1066,7 +1184,7 @@ export default function Instances(p: Common & { running: Record<string, boolean>
               <li key={x.id} className="mc-tilewrap">
                 <button className="mc-tile" onClick={() => setOpenId(x.id)}>
                   <div className="mc-tile-art" style={coverStyle(x.id, covers[x.id])}>
-                    {!covers[x.id] && <span className="mc-cover-letter">{MONOGRAM[x.loader] ?? "MC"}</span>}
+                    {!covers[x.id] && <Brand />}
                     <span className="mc-badge">
                       {t(`mc.loaders.${x.loader}`)} · {x.mc_version}
                     </span>

@@ -1175,7 +1175,9 @@
       "name": "Name",
       "size": "Size",
       "active": "Active",
-      "action": "Action"
+      "action": "Action",
+      "author": "Author",
+      "env": "Runs on"
     },
     "menu": {
       "more": "More",
@@ -1288,7 +1290,8 @@
       "memory": "“{{name}}” ran out of memory. Give it more in the profile options.",
       "java": "“{{name}}” was started with a Java that is too old for this version. Leave the Java path empty so the right one is downloaded.",
       "mods": "“{{name}}” stopped because of a mod: {{detail}}",
-      "unknown": "“{{name}}” closed with an error. The log shows what happened."
+      "unknown": "“{{name}}” closed with an error. The log shows what happened.",
+      "natives": "“{{name}}” stopped: the game's native libraries were not found. Repair the pack from its menu and start it again. {{detail}}"
     },
     "connectCf": "Connect",
     "generalHint": "The folder, the player name and the CurseForge key are shared by all packs.",
@@ -1342,6 +1345,31 @@
       "ms_app_not_approved": "Mojang has not approved this application yet, so it cannot sign in to Minecraft.",
       "ms_minecraft_failed": "The Minecraft service did not accept the sign-in.",
       "ms_no_game": "This account does not own Minecraft Java Edition."
+    },
+    "addMods": "Add mods",
+    "backToPack": "Back to the pack",
+    "proj": {
+      "back": "Back to the catalog",
+      "by": "by {{who}}",
+      "updated": "Updated {{date}}",
+      "overview": "Overview",
+      "changelog": "Changelog",
+      "gallery": "Gallery",
+      "versions": "Versions",
+      "failed": "The page could not be loaded.",
+      "noChangelog": "No changelog.",
+      "noGallery": "No pictures.",
+      "source": "Source code",
+      "issues": "Issues",
+      "wiki": "Wiki",
+      "game": "Game",
+      "published": "Published"
+    },
+    "env": {
+      "client": "Client",
+      "server": "Server",
+      "clientShort": "Client",
+      "serverShort": "Server"
     }
   },
   "presence": {

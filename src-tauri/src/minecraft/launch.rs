@@ -96,6 +96,10 @@ pub fn build(p: &Paths, inst: &Instance, doc: &Value, java: std::path::PathBuf, 
     let natives = p.instance(&inst.id).join("natives");
     let _ = std::fs::remove_dir_all(&natives);
     versions::extract_natives(&libs, &natives)?;
+    // newer versions point `java.library.path` at `${natives_directory}/java`
+    if doc["arguments"]["jvm"].to_string().contains("natives_directory}/java") {
+        versions::extract_natives(&libs, &natives.join("java"))?;
+    }
 
     let sep = if cfg!(windows) { ";" } else { ":" };
     let mut cp: Vec<String> = vec![];

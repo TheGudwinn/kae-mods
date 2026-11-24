@@ -577,6 +577,128 @@ pub struct ShareCode {
 }
 
 pub const CODE_PREFIX: &str = "KAE1-";
+/// The short form: binary, with a Modrinth version id (8 letters and digits) packed into 6 bytes.
+const CODE2_PREFIX: &str = "KAE2-";
+const B62: &[u8; 62] = b"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const LOADERS: [&str; 5] = ["vanilla", "fabric", "quilt", "forge", "neoforge"];
+
+fn id_to_bytes(id: &str) -> Option<[u8; 6]> {
+    if id.len() != 8 {
+        return None;
+    }
+    let mut n: u64 = 0;
+    for c in id.bytes() {
+        n = n * 62 + B62.iter().position(|b| *b == c)? as u64;
+    }
+    let b = n.to_be_bytes();
+    Some([b[2], b[3], b[4], b[5], b[6], b[7]])
+}
+
+fn bytes_to_id(b: &[u8]) -> String {
+    let mut n: u64 = 0;
+    for x in b {
+        n = (n << 8) | *x as u64;
+    }
+    let mut out = [b'0'; 8];
+    for i in (0..8).rev() {
+        out[i] = B62[(n % 62) as usize];
+        n /= 62;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+fn put_varint(out: &mut Vec<u8>, mut n: usize) {
+    loop {
+        let b = (n & 0x7f) as u8;
+        n >>= 7;
+        if n == 0 {
+            out.push(b);
+            break;
+        }
+        out.push(b | 0x80);
+    }
+}
+
+fn put_str(out: &mut Vec<u8>, s: &str) -> bool {
+    let b = s.as_bytes();
+    if b.len() > 255 {
+        return false;
+    }
+    out.push(b.len() as u8);
+    out.extend_from_slice(b);
+    true
+}
+
+/// `None` when something does not fit the short form; the long one is used then.
+fn encode_v2(c: &ShareCode) -> Option<String> {
+    use base64::Engine;
+    let loader = LOADERS.iter().position(|l| *l == c.loader)? as u8;
+    let default_name = c.name == format!("Minecraft {}", c.mc);
+    let mut out = vec![loader | if default_name { 8 } else { 0 } | if c.lv.is_some() { 16 } else { 0 }];
+    if !put_str(&mut out, &c.mc) || (!default_name && !put_str(&mut out, &c.name)) {
+        return None;
+    }
+    if let Some(lv) = &c.lv {
+        if !put_str(&mut out, lv) {
+            return None;
+        }
+    }
+    for list in [&c.mods, &c.rp, &c.sh] {
+        put_varint(&mut out, list.len());
+    }
+    for id in c.mods.iter().chain(&c.rp).chain(&c.sh) {
+        out.extend_from_slice(&id_to_bytes(id)?);
+    }
+    Some(format!("{CODE2_PREFIX}{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(out)))
+}
+
+fn decode_v2(body: &str) -> Option<ShareCode> {
+    use base64::Engine;
+    let b = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(body.trim()).ok()?;
+    let mut i = 0usize;
+    let flags = *b.get(i)?;
+    i += 1;
+    let mut take_str = |i: &mut usize| -> Option<String> {
+        let n = *b.get(*i)? as usize;
+        let s = b.get(*i + 1..*i + 1 + n)?;
+        *i += 1 + n;
+        String::from_utf8(s.to_vec()).ok()
+    };
+    let mc = take_str(&mut i)?;
+    let name = if flags & 8 != 0 { format!("Minecraft {mc}") } else { take_str(&mut i)? };
+    let lv = if flags & 16 != 0 { Some(take_str(&mut i)?) } else { None };
+    let mut counts = [0usize; 3];
+    for c in counts.iter_mut() {
+        let (mut n, mut shift) = (0usize, 0);
+        loop {
+            let x = *b.get(i)?;
+            i += 1;
+            n |= ((x & 0x7f) as usize) << shift;
+            if x & 0x80 == 0 {
+                break;
+            }
+            shift += 7;
+            if shift > 28 {
+                return None;
+            }
+        }
+        *c = n;
+    }
+    let mut lists: Vec<Vec<String>> = vec![];
+    for n in counts {
+        let mut l = vec![];
+        for _ in 0..n {
+            l.push(bytes_to_id(b.get(i..i + 6)?));
+            i += 6;
+        }
+        lists.push(l);
+    }
+    let loader = LOADERS.get((flags & 7) as usize)?.to_string();
+    let sh = lists.pop()?;
+    let rp = lists.pop()?;
+    let mods = lists.pop()?;
+    Some(ShareCode { v: 1, name, mc, loader, lv, mods, rp, sh })
+}
 
 /// The code of an instance and how many of its files could not be named (not on Modrinth).
 pub async fn export_code(client: &reqwest::Client, p: &Paths, inst: &super::Instance) -> Result<(String, usize)> {
@@ -610,12 +732,18 @@ pub async fn export_code(client: &reqwest::Client, p: &Paths, inst: &super::Inst
         }
     }
     cache.save(p, &inst.id);
+    if let Some(short) = encode_v2(&code) {
+        return Ok((short, skipped));
+    }
     let json = serde_json::to_vec(&code).map_err(e)?;
     Ok((format!("{CODE_PREFIX}{}", base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(json)), skipped))
 }
 
 pub fn decode_code(text: &str) -> Result<ShareCode> {
     use base64::Engine;
+    if let Some(body) = text.trim().strip_prefix(CODE2_PREFIX) {
+        return decode_v2(body).ok_or_else(|| "the code is damaged".to_string());
+    }
     let body = text.trim().strip_prefix(CODE_PREFIX).ok_or("this is not a Kae Mods code")?;
     let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(body.trim()).map_err(|_| "the code is damaged".to_string())?;
     let code: ShareCode = serde_json::from_slice(&bytes).map_err(|_| "the code is damaged".to_string())?;
@@ -659,4 +787,155 @@ pub async fn install_code_files(client: &reqwest::Client, p: &Paths, inst: &supe
     }
     report(total, total);
     Ok(failed)
+}
+
+/// Everything the page of one Modrinth project shows: the project, its authors and its versions.
+pub async fn project_detail(client: &reqwest::Client, id: &str) -> Result<Value> {
+    let id = id.replace(|c: char| !c.is_ascii_alphanumeric() && c != '-' && c != '_', "");
+    let (u1, u2, u3) = (format!("{MODRINTH}/project/{id}"), format!("{MODRINTH}/project/{id}/version"), format!("{MODRINTH}/project/{id}/members"));
+    let (project, versions, team) = tokio::join!(get_json(client, &u1), get_json(client, &u2), get_json(client, &u3));
+    let project = project?;
+    let versions: Vec<Value> = versions
+        .ok()
+        .and_then(|v| v.as_array().cloned())
+        .unwrap_or_default()
+        .into_iter()
+        .take(40)
+        .map(|v| {
+            let files = v["files"].as_array();
+            let size = files.and_then(|f| f.iter().find(|f| f["primary"] == true).or(f.first())).and_then(|f| f["size"].as_u64()).unwrap_or(0);
+            serde_json::json!({
+                "id": v["id"], "name": v["name"], "version_number": v["version_number"], "version_type": v["version_type"],
+                "game_versions": v["game_versions"], "loaders": v["loaders"], "date_published": v["date_published"],
+                "downloads": v["downloads"], "changelog": v["changelog"], "size": size,
+            })
+        })
+        .collect();
+    let team: Vec<String> = team.ok().and_then(|t| t.as_array().cloned()).unwrap_or_default().iter().filter_map(|m| m["user"]["username"].as_str().map(String::from)).collect();
+    Ok(serde_json::json!({
+        "id": project["id"], "slug": project["slug"], "title": project["title"], "description": project["description"], "body": project["body"],
+        "icon": project["icon_url"], "downloads": project["downloads"], "followers": project["followers"], "categories": project["categories"],
+        "game_versions": project["game_versions"], "loaders": project["loaders"], "updated": project["updated"], "project_type": project["project_type"],
+        "gallery": project["gallery"], "team": team, "versions": versions,
+        "source_url": project["source_url"], "issues_url": project["issues_url"], "wiki_url": project["wiki_url"],
+    }))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileMeta {
+    pub kind: String,
+    pub file: String,
+    pub project: String,
+    pub title: String,
+    pub icon: Option<String>,
+    pub author: String,
+    pub more_authors: usize,
+    pub client: String,
+    pub server: String,
+}
+
+/// The last answer, read from disk with no network: the page shows it at once while a fresh one is fetched.
+pub fn cached_file_meta(p: &Paths, id: &str) -> Vec<FileMeta> {
+    std::fs::read_to_string(p.instance(id).join("filemeta.json")).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
+}
+
+/// What Modrinth knows about the files of an instance (title, picture, author, where it runs), found by their hashes.
+pub async fn file_meta(client: &reqwest::Client, p: &Paths, inst: &super::Instance) -> Result<Vec<FileMeta>> {
+    let mut cache = HashCache::load(p, &inst.id);
+    let mut by_hash: std::collections::HashMap<String, (String, String)> = std::collections::HashMap::new();
+    for kind in ["mod", "resourcepack", "shader"] {
+        for d in std::fs::read_dir(game_dir(p, &inst.id).join(folder_for(kind))).into_iter().flatten().flatten() {
+            if d.path().is_dir() {
+                continue;
+            }
+            if let Some(h) = cache.sha1(&d.path()) {
+                by_hash.insert(h, (kind.to_string(), d.file_name().to_string_lossy().into_owned()));
+            }
+        }
+    }
+    cache.save(p, &inst.id);
+    if by_hash.is_empty() {
+        return Ok(vec![]);
+    }
+    let hashes: Vec<&String> = by_hash.keys().collect();
+    let body = serde_json::json!({ "hashes": hashes, "algorithm": "sha1" });
+    let r = client.post(format!("{MODRINTH}/version_files")).json(&body).send().await.map_err(e)?;
+    if !r.status().is_success() {
+        return Err(format!("modrinth: http {}", r.status().as_u16()));
+    }
+    let versions: Value = r.json().await.map_err(e)?;
+    let mut of_hash: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for (h, v) in versions.as_object().into_iter().flatten() {
+        if let Some(pid) = v["project_id"].as_str() {
+            of_hash.insert(h.clone(), pid.to_string());
+        }
+    }
+    let mut ids: Vec<String> = of_hash.values().cloned().collect();
+    ids.sort();
+    ids.dedup();
+    let mut projects: std::collections::HashMap<String, Value> = std::collections::HashMap::new();
+    for chunk in ids.chunks(100) {
+        let url = format!("{MODRINTH}/projects?ids={}", url::form_urlencoded::byte_serialize(serde_json::to_string(chunk).map_err(e)?.as_bytes()).collect::<String>());
+        if let Ok(v) = get_json(client, &url).await {
+            for pr in v.as_array().into_iter().flatten() {
+                if let Some(id) = pr["id"].as_str() {
+                    projects.insert(id.to_string(), pr.clone());
+                }
+            }
+        }
+    }
+    let mut teams: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+    let team_ids: Vec<String> = projects.values().filter_map(|pr| pr["team"].as_str().map(String::from)).collect();
+    for chunk in team_ids.chunks(100) {
+        let url = format!("{MODRINTH}/teams?ids={}", url::form_urlencoded::byte_serialize(serde_json::to_string(chunk).map_err(e)?.as_bytes()).collect::<String>());
+        if let Ok(v) = get_json(client, &url).await {
+            for members in v.as_array().into_iter().flatten() {
+                let names: Vec<String> = members.as_array().into_iter().flatten().filter_map(|m| m["user"]["username"].as_str().map(String::from)).collect();
+                if let Some(t) = members.as_array().and_then(|a| a.first()).and_then(|m| m["team_id"].as_str()) {
+                    teams.insert(t.to_string(), names);
+                }
+            }
+        }
+    }
+    let mut out = vec![];
+    for (h, (kind, file)) in by_hash {
+        let Some(pid) = of_hash.get(&h) else { continue };
+        let Some(pr) = projects.get(pid) else { continue };
+        let names = pr["team"].as_str().and_then(|t| teams.get(t)).cloned().unwrap_or_default();
+        out.push(FileMeta {
+            kind,
+            file,
+            project: pid.clone(),
+            title: pr["title"].as_str().unwrap_or("").into(),
+            icon: pr["icon_url"].as_str().map(String::from),
+            author: names.first().cloned().unwrap_or_default(),
+            more_authors: names.len().saturating_sub(1),
+            client: pr["client_side"].as_str().unwrap_or("unknown").into(),
+            server: pr["server_side"].as_str().unwrap_or("unknown").into(),
+        });
+    }
+    if let Ok(t) = serde_json::to_string(&out) {
+        let _ = std::fs::write(p.instance(&inst.id).join("filemeta.json"), t);
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod code_tests {
+    use super::*;
+
+    #[test]
+    fn the_short_code_round_trips_and_is_short() {
+        let c = ShareCode { v: 1, name: "Minecraft 1.20.1".into(), mc: "1.20.1".into(), loader: "fabric".into(), lv: Some("0.20.1".into()), mods: vec!["AANobbMI".into(), "u6dRKJwZ".into()], rp: vec![], sh: vec!["00000000".into()] };
+        let text = encode_v2(&c).unwrap();
+        assert!(text.len() < 60, "{text}");
+        let back = decode_code(&text).unwrap();
+        assert_eq!((back.name, back.mc, back.loader, back.lv, back.mods, back.rp, back.sh), (c.name, c.mc, c.loader, c.lv, c.mods, c.rp, c.sh));
+    }
+
+    #[test]
+    fn the_old_code_still_reads() {
+        let old = "KAE1-eyJ2IjoxLCJuYW1lIjoiTWluZWNyYWZ0IDI2LjQtcHJlLTEiLCJtYyI6IjI2LjQtcHJlLTEiLCJsb2FkZXIiOiJmYWJyaWMiLCJsdiI6IjAuMjAuMSIsIm1vZHMiOltdLCJycCI6W10sInNoIjpbXX0";
+        assert_eq!(decode_code(old).unwrap().mc, "26.4-pre-1");
+    }
 }

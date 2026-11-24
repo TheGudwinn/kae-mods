@@ -6,6 +6,7 @@ import Select from "../../components/Select";
 import Instances from "./Instances";
 import { setPlaying } from "../../lib/presence";
 import Icon from "../../components/Icons";
+import ProjectPage from "./ProjectPage";
 
 export type OpenRequest = { id?: string; tab?: string; settings?: boolean };
 export type McPage = "instances" | "browse";
@@ -31,6 +32,7 @@ type Hit = { provider: string; id: string; slug: string; title: string; descript
 type Page = { hits: Hit[]; total: number };
 export type McFile = { kind: string; name: string; size: number; enabled: boolean };
 export type Cfg = { has_curseforge_key: boolean; account_name: string };
+export type Launch = { id: string; text: string; done: number; total: number };
 export type Progress = { id: string; stage: string; done: number; total: number };
 
 const KINDS = ["mod", "modpack", "resourcepack", "shader"] as const;
@@ -57,6 +59,16 @@ export default function Minecraft({ page, onGo }: { page: McPage; onGo: (p: McPa
     setMsg(null);
     onGo("instances");
   };
+  // the pack that is open on its own page: the page switch gives way to an "add mods" button
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const inDetail = page === "instances" && !!detailId;
+  // the catalog opened from inside a pack: it installs only there and goes back to that pack
+  const [addingTo, setAddingTo] = useState<string | null>(null);
+  const addingInst = page === "instances" ? instances.find((i) => i.id === addingTo) : undefined;
+  const leaveAdding = () => {
+    if (addingTo) setOpenRequest({ id: addingTo });
+    setAddingTo(null);
+  };
   const openSettings = () => {
     setOpenRequest({ settings: true });
     onGo("instances");
@@ -77,6 +89,12 @@ export default function Minecraft({ page, onGo }: { page: McPage; onGo: (p: McPa
     },
     [t],
   );
+  // a message of success goes away by itself
+  useEffect(() => {
+    if (!msg || msg.kind !== "ok" || msg.open) return;
+    const id = setTimeout(() => setMsg(null), 6000);
+    return () => clearTimeout(id);
+  }, [msg]);
   const fail = useCallback((x: unknown) => setMsg({ kind: "error", text: explain(x) }), [explain]);
 
   const reload = useCallback(async () => {
@@ -161,7 +179,10 @@ export default function Minecraft({ page, onGo }: { page: McPage; onGo: (p: McPa
       </button>
     </div>
   );
-  const bar = busy && progress && (
+  // starting a pack that is open shows its progress inside the pack, not on top of the page
+  const inlineBar = !!busy && !!progress && page === "instances" && !!detailId && busy === `play:${detailId}`;
+  const launch: Launch | null = inlineBar && progress ? { id: progress.id, text: stageText(progress), done: progress.done, total: progress.total } : null;
+  const bar = busy && progress && !inlineBar && (
     <div className="mc-progress" role="status">
       <span>{stageText(progress)}</span>
       {progress.total > 0 && <progress value={progress.done} max={progress.total} aria-label={stageText(progress)} />}
@@ -174,20 +195,30 @@ export default function Minecraft({ page, onGo }: { page: McPage; onGo: (p: McPa
   return (
     <section className="view mc">
       <header className="view-head">
-        <div className="view-title-row">
-          <h1 className="view-title">{page === "instances" ? t("mc.instances") : t("mc.browse")}</h1>
-        </div>
-        <div className="tabs" role="tablist">
-          {(["instances", "browse"] as const).map((p) => (
-            <button key={p} role="tab" aria-selected={page === p} className={`tab ${page === p ? "tab-on" : ""}`} onClick={() => onGo(p)}>
-              {t(`mc.${p}`)}
+        {!inDetail && <div className="view-title-row">
+          {addingInst && (
+            <button className="btn btn-quiet mc-back" onClick={leaveAdding}>
+              <Icon name="left" size={18} />
+              {t("mc.backToPack")}
             </button>
-          ))}
-        </div>
+          )}
+          <h1 className="view-title">{addingInst ? addingInst.name : page === "instances" ? t("mc.instances") : t("mc.browse")}</h1>
+        </div>}
+        {!inDetail && !addingInst && (
+          <div className="tabs" role="tablist">
+            {(["instances", "browse"] as const).map((p) => (
+              <button key={p} role="tab" aria-selected={page === p} className={`tab ${page === p ? "tab-on" : ""}`} onClick={() => onGo(p)}>
+                {t(`mc.${p}`)}
+              </button>
+            ))}
+          </div>
+        )}
       </header>
       {banner}
       {bar}
-      {page === "instances" ? (
+      {addingInst ? (
+        <Browse lockedId={addingInst.id} instances={instances} versions={versions} cfg={cfg} selected={addingInst.id} setSelected={setSelected} reload={reload} fail={fail} say={(text, open) => setMsg({ kind: "ok", text, open })} busy={busy} setBusy={setBusy} onGo={onGo} setProgress={setProgress} openInstance={openInstance} openSettings={openSettings} />
+      ) : page === "instances" ? (
         <Instances
           instances={instances}
           versions={versions}
@@ -205,6 +236,9 @@ export default function Minecraft({ page, onGo }: { page: McPage; onGo: (p: McPa
           onGo={onGo}
           openRequest={openRequest}
           onOpened={() => setOpenRequest(null)}
+          onDetail={setDetailId}
+          onAdd={setAddingTo}
+          launch={launch}
         />
       ) : (
         <Browse instances={instances} versions={versions} cfg={cfg} selected={selected} setSelected={setSelected} reload={reload} fail={fail} say={(text, open) => setMsg({ kind: "ok", text, open })} busy={busy} setBusy={setBusy} onGo={onGo} setProgress={setProgress} openInstance={openInstance} openSettings={openSettings} />
@@ -235,7 +269,7 @@ const CATEGORIES: Record<string, string[]> = {
   shader: ["cartoon", "fantasy", "realistic", "vanilla-like", "semi-realistic", "potato", "low", "medium", "high"],
 };
 
-function Browse(p: Common & { onGo: (p: McPage) => void; openInstance: (id: string) => void; openSettings: () => void }) {
+function Browse(p: Common & { lockedId?: string; onGo: (p: McPage) => void; openInstance: (id: string) => void; openSettings: () => void }) {
   const { t } = useTranslation();
   const { instances, versions, cfg, selected } = p;
   const [provider, setProvider] = useState("modrinth");
@@ -251,6 +285,7 @@ function Browse(p: Common & { onGo: (p: McPage) => void; openInstance: (id: stri
   const [sort, setSort] = useState<string>("");
   const [category, setCategory] = useState<string>("");
   const [retry, setRetry] = useState(0);
+  const [viewing, setViewing] = useState<Hit | null>(null);
   // projects the chosen instance already has, as `provider:id`
   const [have, setHave] = useState<Set<string>>(new Set());
   const [haveTick, setHaveTick] = useState(0);
@@ -316,13 +351,26 @@ function Browse(p: Common & { onGo: (p: McPage) => void; openInstance: (id: stri
   };
 
   const keyMissing = provider === "curseforge" && error === "curseforge_key_missing";
+  if (viewing) {
+    return (
+      <ProjectPage
+        hit={viewing}
+        installed={kind === "modpack" ? !!packOf(viewing) : have.has(`${viewing.provider}:${viewing.id}`)}
+        installing={p.busy === `i:${viewing.id}`}
+        canInstall={!p.busy && (kind === "modpack" || !!cur)}
+        installLabel={kind === "modpack" ? t("mc.installPack") : t("mc.install")}
+        onInstall={() => void install(viewing)}
+        onBack={() => setViewing(null)}
+      />
+    );
+  }
   const releases = versions.filter((v) => v.kind === "release");
   return (
     <div className="mc-browse">
       <div className="toolbar mc-toolbar">
         <input className="field search" type="search" value={text} placeholder={t("mc.search")} aria-label={t("mc.search")} onChange={(e) => setText(e.target.value)} />
         <Select label={t("mc.source")} value={provider} onChange={(v) => (setProvider(v), setPageNo(0))} options={[{ value: "modrinth", label: "Modrinth" }, { value: "curseforge", label: "CurseForge" }]} />
-        <Select label={t("mc.version")} value={allVer} onChange={(v) => (setAllVer(v), setPageNo(0))} options={[{ value: "", label: kind === "modpack" ? t("mc.anyVersion") : cur ? `${cur.mc_version} (${cur.name})` : t("mc.anyVersion") }, ...releases.map((v) => ({ value: v.id, label: v.id }))]} />
+        <Select label={t("mc.version")} value={allVer} onChange={(v) => (setAllVer(v), setPageNo(0))} options={[{ value: "", label: kind === "modpack" ? t("mc.anyVersion") : cur ? cur.mc_version : t("mc.anyVersion") }, ...releases.filter((v) => kind === "modpack" || !cur || v.id !== cur.mc_version).map((v) => ({ value: v.id, label: v.id }))]} />
         {(kind === "mod" || kind === "modpack") && (
           <Select label={t("mc.loader")} value={allLoader} onChange={(v) => (setAllLoader(v), setPageNo(0))} options={[{ value: "", label: kind === "modpack" ? t("mc.anyLoader") : cur && cur.loader !== "vanilla" ? t(`mc.loaders.${cur.loader}`) : t("mc.anyLoader") }, { value: "fabric", label: "Fabric" }, { value: "quilt", label: "Quilt" }, { value: "forge", label: "Forge" }, { value: "neoforge", label: "NeoForge" }]} />
         )}
@@ -331,10 +379,10 @@ function Browse(p: Common & { onGo: (p: McPage) => void; openInstance: (id: stri
           <Select label={t("mc.category")} value={category} onChange={(v) => (setCategory(v), setPageNo(0))} options={[{ value: "", label: t("mc.anyCategory") }, ...(CATEGORIES[kind] ?? []).map((c) => ({ value: c, label: t(`mc.cat.${c}`, { defaultValue: c }) }))]} />
         )}
       </div>
-      {kind !== "modpack" && instances.length > 0 && (
+      {kind !== "modpack" && instances.length > 0 && !p.lockedId && (
         <div className="mc-target">
           <span>{t("mc.installingInto")}</span>
-          <Select label={t("mc.installTo")} value={selected} onChange={p.setSelected} options={instances.map((i) => ({ value: i.id, label: i.name }))} />
+          {p.lockedId ? <strong>{cur?.name}</strong> : <Select label={t("mc.installTo")} value={selected} onChange={p.setSelected} options={instances.map((i) => ({ value: i.id, label: i.name }))} />}
           {cur && (
             <span className="note">
               {cur.mc_version} · {t(`mc.loaders.${cur.loader}`)}
@@ -343,7 +391,7 @@ function Browse(p: Common & { onGo: (p: McPage) => void; openInstance: (id: stri
         </div>
       )}
       <div className="tabs" role="tablist">
-        {KINDS.map((k) => (
+        {KINDS.filter((k) => !p.lockedId || k !== "modpack").map((k) => (
           <button key={k} role="tab" aria-selected={kind === k} className={`tab ${kind === k ? "tab-on" : ""}`} onClick={() => (setKind(k), setPageNo(0), setCategory(""))}>
             {t(`mc.kindsPlural.${k}`)}
           </button>
@@ -382,7 +430,13 @@ function Browse(p: Common & { onGo: (p: McPage) => void; openInstance: (id: stri
               <li key={h.id} className="mc-hit">
                 {h.icon ? <img src={h.icon} alt="" loading="lazy" className="mc-ico" /> : <span className="mc-ico" />}
                 <div className="mc-hit-body">
-                  <strong>{h.title}</strong>
+                  {h.provider === "modrinth" ? (
+                    <button className="mc-hit-title" onClick={() => setViewing(h)}>
+                      {h.title}
+                    </button>
+                  ) : (
+                    <strong>{h.title}</strong>
+                  )}
                   <span className="note">
                     {h.author} · {t("mc.downloads", { n: fmt(h.downloads) })}
                   </span>

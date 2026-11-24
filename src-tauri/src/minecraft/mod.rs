@@ -323,11 +323,11 @@ mod tests {
         assert!(!prep.args.join(" ").contains("${"), "{:?}", prep.args);
 
         // catalogs
-        let page = catalog::search(&client, "", &catalog::SearchReq { provider: "modrinth".into(), query: "sodium".into(), kind: "mod".into(), mc_version: Some("1.20.1".into()), loader: Some("fabric".into()), page: 0 }).await.unwrap();
+        let page = catalog::search(&client, "", &catalog::SearchReq { provider: "modrinth".into(), query: "sodium".into(), kind: "mod".into(), mc_version: Some("1.20.1".into()), loader: Some("fabric".into()), page: 0, sort: None, category: None }).await.unwrap();
         assert!(page.hits.iter().any(|h| h.slug == "sodium"));
         let pick = catalog::pick_file(&client, "", "modrinth", "AANobbMI", "mod", "1.20.1", "fabric").await.unwrap();
         assert!(pick.name.ends_with(".jar"));
-        let packs = catalog::search(&client, "", &catalog::SearchReq { provider: "modrinth".into(), query: "".into(), kind: "modpack".into(), mc_version: None, loader: None, page: 0 }).await.unwrap();
+        let packs = catalog::search(&client, "", &catalog::SearchReq { provider: "modrinth".into(), query: "".into(), kind: "modpack".into(), mc_version: None, loader: None, page: 0, sort: None, category: None }).await.unwrap();
         assert!(!packs.hits.is_empty());
     }
 
@@ -342,7 +342,7 @@ mod tests {
         p.set_root(Some(&dir.join("data"))).unwrap();
         let client = reqwest::Client::builder().user_agent("kae-mods-test").build().unwrap();
         if let Ok(key) = std::env::var("CF_KEY") {
-            let page = catalog::search(&client, &key, &catalog::SearchReq { provider: "curseforge".into(), query: "jei".into(), kind: "mod".into(), mc_version: Some("1.20.1".into()), loader: Some("fabric".into()), page: 0 }).await.unwrap();
+            let page = catalog::search(&client, &key, &catalog::SearchReq { provider: "curseforge".into(), query: "jei".into(), kind: "mod".into(), mc_version: Some("1.20.1".into()), loader: Some("fabric".into()), page: 0, sort: None, category: None }).await.unwrap();
             assert!(!page.hits.is_empty(), "curseforge returned nothing");
             let pick = catalog::pick_file(&client, &key, "curseforge", &page.hits[0].id, "mod", "1.20.1", "fabric").await.unwrap();
             println!("curseforge: {} -> {}", page.hits[0].title, pick.name);
