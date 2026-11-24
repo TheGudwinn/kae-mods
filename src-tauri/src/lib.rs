@@ -4,7 +4,10 @@ pub mod error;
 pub mod game;
 pub mod history;
 pub mod install;
+pub mod legacy;
+pub mod presence;
 pub mod library;
+pub mod minecraft;
 pub mod net;
 pub mod profiles;
 pub mod queue;
@@ -17,6 +20,9 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // data of the earlier builds moves to the new folder before anything opens a file there
+    #[cfg(windows)]
+    legacy::migrate();
     let net = Arc::new(net::NetService::new(net::config::NetConfig::default()).expect("default net config is valid"));
     let gb = Arc::new(sources::gamebanana::GameBanana::new(net.clone()));
 
@@ -121,6 +127,54 @@ pub fn run() {
             commands::perf_apply,
             commands::perf_fix_foreign,
             commands::check_update,
+            commands::mc_config,
+            commands::mc_root,
+            commands::mc_set_root,
+            commands::mc_save_config,
+            commands::mc_game_versions,
+            commands::mc_loader_versions,
+            commands::mc_instances,
+            commands::mc_create_instance,
+            commands::mc_update_instance,
+            commands::mc_delete_instance,
+            commands::mc_prepare,
+            commands::mc_launch,
+            commands::mc_running,
+            commands::mc_stop,
+            commands::mc_java,
+            commands::mc_search,
+            commands::mc_install_project,
+            commands::mc_install_modpack,
+            commands::mc_export_instance,
+            commands::mc_import_pack,
+            commands::mc_files,
+            commands::mc_file_enabled,
+            commands::mc_file_remove,
+            commands::mc_open_folder,
+            commands::mc_log,
+            commands::mc_screenshots,
+            commands::mc_check_updates,
+            commands::mc_update_file,
+            commands::mc_covers,
+            commands::mc_set_cover,
+            commands::mc_installed,
+            commands::mc_system_memory,
+            commands::mc_cancel,
+            commands::mc_ms_start,
+            commands::mc_ms_poll,
+            commands::mc_ms_logout,
+            commands::mc_clone_instance,
+            commands::mc_repair_instance,
+            commands::mc_backup_saves,
+            commands::mc_check_pack_update,
+            commands::mc_update_pack,
+            commands::mc_export_code,
+            commands::mc_import_code,
+            commands::mc_set_cover_url,
+            commands::mc_screenshot,
+            commands::mc_open_screenshot,
+            commands::presence_set,
+            commands::presence_available,
             commands::install_update
         ])
         .build(tauri::generate_context!())
