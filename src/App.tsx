@@ -48,8 +48,11 @@ import Settings from "./features/settings/Settings";
 import Downloads from "./features/downloads/Downloads";
 import Performance from "./features/performance/Performance";
 import Fixes from "./features/fixes/Fixes";
+import { usePresence } from "./lib/presence";
+import Minecraft, { type McPage } from "./features/minecraft/Minecraft";
 const Skins = lazy(() => import("./features/skins/Skins")); // pulls in the 3D engine, so it loads on first visit
 
+type GameId = "deadlock" | "minecraft";
 type View = "home" | "catalog" | "library" | "profiles" | "loadouts" | "downloads" | "performance" | "fixes" | "skins" | "settings";
 
 export default function App() {
@@ -58,6 +61,23 @@ export default function App() {
   const wallpaper = useEffectiveWallpaper();
   const ownWallpaper = useWallpaper();
   const [view, setViewRaw] = useState<View>("home");
+  const [gameId, setGameId] = useState<GameId>(() => {
+    try {
+      return localStorage.getItem("kae.game") === "minecraft" ? "minecraft" : "deadlock";
+    } catch {
+      return "deadlock";
+    }
+  });
+  const [mcPage, setMcPage] = useState<McPage>("instances");
+  usePresence(gameId === "minecraft" ? "Minecraft" : "Deadlock", gameId === "minecraft" ? t(`presence.mc.${mcPage}`) : t(`presence.view.${view}`), (n) => t("presence.playing", { name: n }));
+  const chooseGame = (g: GameId) => {
+    setGameId(g);
+    try {
+      localStorage.setItem("kae.game", g);
+    } catch {
+      /* the choice is just forgotten */
+    }
+  };
   const viewRef = useRef(view);
   viewRef.current = view;
   // Page changes cross-fade through the browser's View Transitions when it has them.
@@ -675,7 +695,20 @@ export default function App() {
           <span className="sr-only">{t("app.name")}</span>
         </div>
         <div className="rail-spacer" data-tauri-drag-region />
-        {(
+        {gameId === "minecraft" ? (
+          (
+            [
+              ["instances", "library"],
+              ["browse", "catalog"],
+            ] as const
+          ).map(([id, icon]) => (
+            <button key={id} className="rail-item" data-tip={t(`mc.${id}`)} aria-current={mcPage === id ? "page" : undefined} aria-label={t(`mc.${id}`)} onClick={() => setMcPage(id)}>
+              <Icon name={icon} />
+              <span className="rail-label">{t(`mc.${id}`)}</span>
+            </button>
+          ))
+        ) : (
+          (
           [
             ["home", "home", 0],
             ["catalog", "catalog", 0],
@@ -689,7 +722,8 @@ export default function App() {
             <span className="rail-label">{navName(id)}</span>
             {badge > 0 && <span className="rail-badge">{badge}</span>}
           </button>
-        ))}
+        ))
+        )}
         <div className="rail-spacer" data-tauri-drag-region />
         {update && look.rail === "open" && <UpdateBanner info={update} progress={updatePct} onInstall={() => void installUpdate()} onDismiss={() => setUpdate(null)} />}
         <button className="rail-item" data-tip={hint("settings")} aria-current={railOf(view) === "settings" ? "page" : undefined} aria-label={t("nav.settings")} onClick={() => setView("settings")}>
@@ -698,10 +732,14 @@ export default function App() {
           {patchBadge > 0 && <span className="rail-badge">{patchBadge}</span>}
         </button>
         <div className="rail-games" role="group" aria-label={t("games.title")}>
-          <button className="game-btn" aria-current="true" data-tip="Deadlock" aria-label="Deadlock" onClick={() => setView("home")}>
+          <button className="game-btn" aria-current={gameId === "deadlock" ? "true" : undefined} data-tip="Deadlock" aria-label="Deadlock" onClick={() => (chooseGame("deadlock"), setView("home"))}>
             <img src={gameMark} alt="" />
             <span className={`dot ${game === null ? "off" : ""}`} aria-hidden="true" />
             <span className="game-name">Deadlock</span>
+          </button>
+          <button className="game-btn" aria-current={gameId === "minecraft" ? "true" : undefined} data-tip="Minecraft" aria-label="Minecraft" onClick={() => chooseGame("minecraft")}>
+            <span className="mc-mark" aria-hidden="true" />
+            <span className="game-name">Minecraft</span>
           </button>
           <button className="game-btn game-add" disabled data-tip={t("games.soon")} aria-label={t("games.soon")}>
             <Icon name="plus" size={18} />
@@ -733,7 +771,7 @@ export default function App() {
                 </span>
               )}
             </button>
-            {profiles && profiles.length > 0 && (
+            {gameId === "deadlock" && profiles && profiles.length > 0 && (
               <Select
                 className="select-profile"
                 label={t("profiles.switch")}
@@ -745,7 +783,7 @@ export default function App() {
                 options={[...(activeProfile ? [] : [{ value: "", label: t("profiles.pick") }]), ...profiles.map((p) => ({ value: String(p.id), label: p.name }))]}
               />
             )}
-            <div className="playblock">
+            {gameId === "deadlock" && <div className="playblock">
               <button className="btn btn-play" disabled={!game || launching || running} aria-busy={launching} onClick={() => void launchGame()} title={game ? t("game.playHint") : t("game.notFoundHint")}>
                 <Icon name="play" />
                 {running ? t("game.running") : launching ? t("game.starting") : t("game.play")}
@@ -755,7 +793,7 @@ export default function App() {
                   {!game ? t("game.notFound") : running ? t("game.runningHint") : t("game.pending")}
                 </span>
               )}
-            </div>
+            </div>}
             <button className="btn-icon" aria-label={t("nav.feedback")} title={t("nav.feedback")} onClick={() => setFeedbackOpen(true)}>
               <Icon name="chat" size={16} />
             </button>
@@ -772,8 +810,10 @@ export default function App() {
           </div>
         )}
       <main className="main">
-        <ErrorBoundary key={view}>
-        {view === "home" ? (
+        <ErrorBoundary key={gameId === "minecraft" ? "mc" : view}>
+        {gameId === "minecraft" ? (
+          <Minecraft page={mcPage} onGo={setMcPage} />
+        ) : view === "home" ? (
           <Home
             installed={installed}
             groups={groups}

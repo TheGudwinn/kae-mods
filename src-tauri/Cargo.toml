@@ -38,6 +38,9 @@ zip = { version = "9.5.1", default-features = false, features = ["deflate"] }
 crc32fast = "1.5.5"
 async-trait = "0.1.92"
 md-5 = "0.11.0"
+sha1 = "0.10"
+discord-rich-presence = "1.1.0"
+sysinfo = { version = "0.37", default-features = false, features = ["system"] }
 sevenz-rust2 = "0.25.0"
 unrar = "0.5.8"
 tauri-plugin-dialog = "2.8.4"

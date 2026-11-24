@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { call } from "./api";
 import { humanizeError } from "./format";
@@ -76,7 +76,8 @@ export function useCompat(): Compat {
         setReport(r);
         // a package made from mods that have changed since overrides the real models and shows up as red shapes
         // in the game: rebuild it at once, without waiting for a click
-        if (r.findings.some((f) => f.kind === "compat_stale")) {
+        // the same when the game was updated or another manager's search path put the package out of play
+        if (r.findings.some((f) => f.kind === "compat_stale" || f.kind === "package_inactive")) {
           if (!cleaned.current) {
             cleaned.current = true;
             await call("repair_cameras");
@@ -106,6 +107,20 @@ export function useCompat(): Compat {
       setRepairing(false);
     }
   }, [scan, report, t]);
+
+  // The game updates while the launcher is open or closed: scan at start and when the window is used again
+  // (at most every ten minutes), so a package an update put out of play is rebuilt without a click.
+  useEffect(() => {
+    let last = Date.now();
+    void scan();
+    const onFocus = () => {
+      if (Date.now() - last < 10 * 60 * 1000) return;
+      last = Date.now();
+      void scan();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [scan]);
 
   return { report, scanning, repairing, error, done, scan, repair };
 }

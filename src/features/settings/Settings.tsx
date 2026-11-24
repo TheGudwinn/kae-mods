@@ -4,6 +4,8 @@ import i18n from "../../i18n";
 import { call, isTauri, type GameInstall, type HostReport, type ProxyMode, type SettingsView, type UpdateInfo } from "../../lib/api";
 import { humanizeError } from "../../lib/format";
 import GameOptions from "./GameOptions";
+import Presence from "./Presence";
+import McSettings from "./McSettings";
 import Appearance from "./Appearance";
 import Select from "../../components/Select";
 
@@ -169,6 +171,8 @@ export default function Settings({ game, onSaved, onCheckUpdate }: Props) {
 
       <div className="settings">
         <Appearance />
+        <Presence />
+        <McSettings />
       </div>
 
       <form className="settings" onSubmit={save}>

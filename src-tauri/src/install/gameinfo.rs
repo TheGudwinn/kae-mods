@@ -259,17 +259,21 @@ fn with_pin(text: &str, result: PatchResult) -> PatchResult {
     }
 }
 
-/// Make sure `Game <rel>` is listed in SearchPaths right before the `citadel/addons` line, so files in
+/// Make sure `Game <rel>` is listed in SearchPaths right before the first `citadel/addons` line, so files in
 /// `<rel>` win over every addon. An earlier search path has priority in the engine.
+/// A `<rel>` line that sits after an addons line (another manager wrote its own addons line above ours) does
+/// nothing: it is moved up in front of the addons line.
 pub fn ensure_path_before_addons(text: &str, rel: &str) -> PatchResult {
     let Some(toks) = lex(text) else { return PatchResult::Unrecognized };
     let Some(blocks) = parse_blocks(&toks) else { return PatchResult::Unrecognized };
-    if blocks.iter().any(|b| b.games.iter().any(|(_, p)| same_path(p, rel))) {
+    let at = blocks.iter().filter_map(|b| b.games.iter().filter(|(_, p)| same_path(p, ADDONS)).map(|(l, _)| *l).min()).min();
+    let rel_lines: Vec<usize> = blocks.iter().flat_map(|b| b.games.iter().filter(|(_, p)| same_path(p, rel)).map(|(l, _)| *l)).collect();
+    let Some(at) = at else {
+        return if rel_lines.is_empty() { PatchResult::Unrecognized } else { with_pin(text, PatchResult::AlreadyPresent) };
+    };
+    if rel_lines.iter().any(|l| *l < at) {
         return with_pin(text, PatchResult::AlreadyPresent);
     }
-    let Some(at) = blocks.iter().find_map(|b| b.games.iter().find(|(_, p)| same_path(p, ADDONS)).map(|(l, _)| *l)) else {
-        return PatchResult::Unrecognized;
-    };
     let lines: Vec<&str> = text.split_inclusive('\n').collect();
     let Some(line) = lines.get(at) else { return PatchResult::Unrecognized };
     let indent: String = line.chars().take_while(|c| *c == ' ' || *c == '\t').collect();
@@ -280,6 +284,9 @@ pub fn ensure_path_before_addons(text: &str, rel: &str) -> PatchResult {
     for (i, l) in lines.iter().enumerate() {
         if i == at {
             out.push_str(&new_line);
+        }
+        if rel_lines.contains(&i) {
+            continue; // the misplaced line is replaced by the one above
         }
         out.push_str(l);
     }
@@ -338,6 +345,29 @@ mod tests {
         let c = lines.iter().position(|l| l.contains("guddion_compat")).unwrap();
         assert!(lines[c + 1].contains("citadel/addons"), "{lines:?}");
         assert!(matches!(ensure_compat_path(&s, "citadel/guddion_compat"), PatchResult::AlreadyPresent));
+    }
+
+    #[test]
+    fn a_compat_line_below_another_managers_addons_line_moves_above_it() {
+        let t = "GameInfo
+{
+	SearchPaths
+	{
+		Game		citadel/addons // dmm
+		Mod		\"citadel\"
+		Write		\"citadel\"
+		Game citadel/guddion_compat // guddion-compat
+		Game citadel/addons
+		Game citadel
+	}
+}
+";
+        let PatchResult::Patched(s) = ensure_path_before_addons(t, "citadel/guddion_compat") else { panic!("{}", "not patched") };
+        let lines: Vec<&str> = s.lines().map(str::trim).collect();
+        let c = lines.iter().position(|l| l.contains("guddion_compat")).unwrap();
+        let a = lines.iter().position(|l| l.contains("citadel/addons")).unwrap();
+        assert!(c < a && lines.iter().filter(|l| l.contains("guddion_compat")).count() == 1, "{lines:?}");
+        assert!(matches!(ensure_path_before_addons(&s, "citadel/guddion_compat"), PatchResult::AlreadyPresent));
     }
 
     const STOCK: &str = "GameInfo\n{\n\tSearchPaths\n\t{\n\t\tGame_UILanguage\t\tcitadel_*LANGUAGE*\n\t\tGame_LowViolence\tcitadel_lv\n\n\t\tGame\t\t\t\tcitadel\n\t\tGame\t\t\t\tcore\n\t}\n}\n";

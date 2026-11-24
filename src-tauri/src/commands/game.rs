@@ -93,6 +93,15 @@ pub async fn scan_compat(state: State<'_, AppState>) -> Result<crate::game::comp
         if pkg.exists() && !active {
             rep.findings.push(crate::game::compat::CompatFinding { kind: "package_inactive".into(), severity: "warn", model: pkg.display().to_string(), mods: vec![] });
         }
+        // the game was updated after the package was made: its models may have new camera data, so the copies
+        // in the package are out of date
+        let newer = |a: &std::path::Path, b: &std::path::Path| match (std::fs::metadata(a).and_then(|m| m.modified()), std::fs::metadata(b).and_then(|m| m.modified())) {
+            (Ok(x), Ok(y)) => x > y,
+            _ => false,
+        };
+        if pkg.exists() && newer(&g.citadel_dir.join("pak01_dir.vpk"), &pkg) {
+            rep.findings.push(crate::game::compat::CompatFinding { kind: "compat_stale".into(), severity: "warn", model: pkg.display().to_string(), mods: vec![] });
+        }
         Ok(rep)
     })
     .await
@@ -155,6 +164,9 @@ pub async fn repair_cameras(state: State<'_, AppState>) -> Result<crate::game::c
             let old = std::fs::read(&package).map_err(err)?;
             if old != bytes {
                 checks::replace_journaled(&ctx, &batch, &package, &old, &bytes).map_err(err)?;
+            } else if let Ok(f) = std::fs::OpenOptions::new().write(true).open(&package) {
+                // still right for the current game: mark it as checked now, so it is not taken for out of date
+                let _ = f.set_modified(std::time::SystemTime::now());
             }
         } else {
             journal.record(&batch, Op::CreateFile { path: package.clone() }).map_err(err)?;
