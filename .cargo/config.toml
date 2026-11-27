@@ -1,0 +1,4 @@
+[env]
+# The PostgreSQL bundled into the app. Without a pin the build takes the newest one, and a newer major
+# version cannot open the database users already have. Changing the major version needs a data migration.
+POSTGRESQL_VERSION = "=18.7.0"
