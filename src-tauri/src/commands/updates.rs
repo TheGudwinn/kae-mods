@@ -60,6 +60,13 @@ pub fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// False for the portable exe: only the installer leaves an uninstaller next to the app. An update always
+/// goes through the installer, so a portable copy would stay old and reinstall on every start.
+#[tauri::command]
+pub fn is_installed() -> bool {
+    std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("uninstall.exe").is_file())).unwrap_or(false)
+}
+
 /// `Ok(None)` = already up to date.
 #[tauri::command]
 pub async fn check_update(app: AppHandle, state: State<'_, AppState>) -> Result<Option<UpdateInfo>, String> {

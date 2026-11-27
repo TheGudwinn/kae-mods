@@ -2,10 +2,10 @@
 ; The Tauri NSIS template includes this file BEFORE it declares the MUI pages, so these defines apply to them.
 ; (Hooks such as NSIS_HOOK_POSTINSTALL could be added here later; none are needed now.)
 
-; Dark welcome/finish pages and header, matching the app.
-!define MUI_BGCOLOR "080918"
-!define MUI_TEXTCOLOR "EEECF8"
+; Graphite welcome/finish pages and header, matching the app.
+!define MUI_BGCOLOR "17181A"
+!define MUI_TEXTCOLOR "F5F5F6"
 
-; Progress log in the app's violet on the same dark background.
-!define MUI_INSTFILESPAGE_COLORS "A193FF 080918"
+; Progress log in white on the same graphite background.
+!define MUI_INSTFILESPAGE_COLORS "F5F5F6 17181A"
 

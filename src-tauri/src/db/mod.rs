@@ -1,4 +1,5 @@
 use postgresql_embedded::{PostgreSQL, Settings};
+use sha2::{Digest, Sha384};
 use sqlx::postgres::{PgPool, PgPoolOptions};
 use std::path::Path;
 
@@ -14,6 +15,36 @@ pub enum DbError {
     Migrate(#[from] sqlx::migrate::MigrateError),
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
+}
+
+/// True when `applied` is the checksum of `sql` with other line endings.
+fn differs_only_in_line_endings(sql: &str, applied: &[u8]) -> bool {
+    let lf = sql.replace("\r\n", "\n");
+    let crlf = lf.replace('\n', "\r\n");
+    [lf, crlf].iter().any(|text| Sha384::digest(text.as_bytes()).as_slice() == applied)
+}
+
+/// sqlx checksums the raw bytes of a migration file, so a build made from a CRLF checkout rejects a database
+/// created by an LF build (and the other way round). Accept that one difference before running the migrations;
+/// any real change to an applied migration still fails.
+async fn migrate(pool: &PgPool) -> Result<(), DbError> {
+    let migrator = sqlx::migrate!("./migrations");
+    let has_table: bool = sqlx::query_scalar("SELECT to_regclass('_sqlx_migrations') IS NOT NULL").fetch_one(pool).await?;
+    if has_table {
+        let applied: Vec<(i64, Vec<u8>)> = sqlx::query_as("SELECT version, checksum FROM _sqlx_migrations").fetch_all(pool).await?;
+        for (version, checksum) in applied {
+            let Some(m) = migrator.iter().find(|m| m.version == version) else { continue };
+            if m.checksum.as_ref() != checksum.as_slice() && differs_only_in_line_endings(m.sql.as_str(), &checksum) {
+                sqlx::query("UPDATE _sqlx_migrations SET checksum = $1 WHERE version = $2")
+                    .bind(m.checksum.to_vec())
+                    .bind(version)
+                    .execute(pool)
+                    .await?;
+            }
+        }
+    }
+    migrator.run(pool).await?;
+    Ok(())
 }
 
 /// Local PostgreSQL started by the app itself (no external server, no admin rights).
@@ -58,7 +89,7 @@ impl Db {
             let url = format!("postgres://{}:{}@127.0.0.1:{port}/{DB_NAME}", settings.username, settings.password);
             let connect = PgPoolOptions::new().max_connections(5).acquire_timeout(std::time::Duration::from_secs(3)).connect(&url);
             if let Ok(pool) = connect.await {
-                sqlx::migrate!("./migrations").run(&pool).await?;
+                migrate(&pool).await?;
                 return Ok(Self { pool, pg: PostgreSQL::new(settings) });
             }
             let _ = std::process::Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).creation_flags_hidden().output();
@@ -72,7 +103,7 @@ impl Db {
         }
 
         let pool = PgPoolOptions::new().max_connections(5).connect(&pg.settings().url(DB_NAME)).await?;
-        sqlx::migrate!("./migrations").run(&pool).await?;
+        migrate(&pool).await?;
         Ok(Self { pool, pg })
     }
 
@@ -127,4 +158,17 @@ fn rand_bytes() -> [u8; 16] {
     let mut out = [0u8; 16];
     out.copy_from_slice(&(n ^ (std::process::id() as u128) << 64).to_le_bytes());
     out
+}
+
+#[cfg(test)]
+mod line_ending_tests {
+    use super::*;
+
+    #[test]
+    fn accepts_only_a_line_ending_difference() {
+        let lf = "CREATE TABLE a (\n    id INT\n);\n";
+        let crlf_sum = Sha384::digest(lf.replace('\n', "\r\n").as_bytes());
+        assert!(differs_only_in_line_endings(lf, crlf_sum.as_slice()));
+        assert!(!differs_only_in_line_endings("CREATE TABLE b ();\n", crlf_sum.as_slice()));
+    }
 }

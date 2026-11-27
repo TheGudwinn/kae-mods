@@ -127,6 +127,7 @@ pub fn run() {
             commands::perf_apply,
             commands::perf_fix_foreign,
             commands::check_update,
+            commands::is_installed,
             commands::mc_config,
             commands::mc_root,
             commands::mc_set_root,

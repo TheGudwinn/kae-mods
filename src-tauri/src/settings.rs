@@ -8,13 +8,14 @@ use std::path::Path;
 
 pub const SOURCE_GAMEBANANA: &str = "gamebanana";
 
-/// `latest.json` locations tried in order. The release build gets its GitHub repository from the
-/// `DDMM_REPO` environment variable at compile time; a local build has none and updates stay off.
+/// Releases of this repository are the update source. `DDMM_REPO` (set at compile time) lets a fork point
+/// its builds at its own releases.
+const UPDATE_REPO: &str = "TheGudwinn/kae-mods";
+
+/// `latest.json` locations tried in order.
 pub fn default_update_endpoints() -> Vec<String> {
-    option_env!("DDMM_REPO")
-        .filter(|r| !r.is_empty())
-        .map(|repo| vec![format!("https://github.com/{repo}/releases/latest/download/latest.json")])
-        .unwrap_or_default()
+    let repo = option_env!("DDMM_REPO").filter(|r| !r.is_empty()).unwrap_or(UPDATE_REPO);
+    vec![format!("https://github.com/{repo}/releases/latest/download/latest.json")]
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -180,11 +181,18 @@ pub fn clean_mirrors(raw: &[String]) -> Result<Vec<String>, SettingsError> {
 /// so a broken edit never blocks the app from starting.
 pub fn load(path: &Path) -> AppSettings {
     match std::fs::read_to_string(path) {
-        Ok(text) => serde_json::from_str(&text).unwrap_or_else(|e| {
-            eprintln!("settings.json is invalid ({e}); using defaults");
-            let _ = std::fs::rename(path, path.with_extension("json.bad"));
-            AppSettings::default()
-        }),
+        Ok(text) => {
+            let mut settings: AppSettings = serde_json::from_str(&text).unwrap_or_else(|e| {
+                eprintln!("settings.json is invalid ({e}); using defaults");
+                let _ = std::fs::rename(path, path.with_extension("json.bad"));
+                AppSettings::default()
+            });
+            // older builds had no built-in source and saved an empty list; switching updates off is `check_updates`
+            if settings.update_endpoints.is_empty() {
+                settings.update_endpoints = default_update_endpoints();
+            }
+            settings
+        }
         Err(_) => AppSettings::default(),
     }
 }

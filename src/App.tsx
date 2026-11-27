@@ -139,6 +139,8 @@ export default function App() {
   const [checkingMods, setCheckingMods] = useState(false);
   const autoChecked = useRef(false);
   const [updatePct, setUpdatePct] = useState<number | null>(null);
+  // version being installed on its own: shown as a progress toast, the banner is hidden when the rail is narrow
+  const [installing, setInstalling] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   // something changed in the mods since the game was last started
   const [pending, setPending] = useState(false);
@@ -214,7 +216,12 @@ export default function App() {
       try {
         const s = await call<{ check_updates: boolean }>("get_settings");
         if (!s.check_updates) return;
-        setUpdate(await call<UpdateInfo | null>("check_update"));
+        const info = await call<UpdateInfo | null>("check_update");
+        setUpdate(info);
+        // installed right away: at startup there is no work to interrupt. A dev build never replaces itself.
+        if (!info || import.meta.env.DEV) return;
+        if (await call<boolean>("is_installed")) void installUpdate(info.version);
+        else setActivity({ kind: "ok", text: t("update.available", { version: info.version }), sub: t("update.portable") });
       } catch {
         /* the settings screen has a manual check that reports errors */
       }
@@ -227,8 +234,9 @@ export default function App() {
     return info;
   };
 
-  async function installUpdate() {
+  async function installUpdate(version?: string) {
     setUpdatePct(-1);
+    if (version) setInstalling(version);
     const unlisten = isTauri
       ? await listen<{ downloaded: number; total: number | null }>("update-progress", (ev) => {
           const { downloaded, total } = ev.payload;
@@ -240,6 +248,7 @@ export default function App() {
     } catch (e) {
       setActivity({ kind: "error", text: humanizeError(t, e) });
       setUpdatePct(null);
+      setInstalling(null);
     } finally {
       unlisten();
     }
@@ -725,7 +734,7 @@ export default function App() {
         ))
         )}
         <div className="rail-spacer" data-tauri-drag-region />
-        {update && look.rail === "open" && <UpdateBanner info={update} progress={updatePct} onInstall={() => void installUpdate()} onDismiss={() => setUpdate(null)} />}
+        {update && look.rail === "open" && <UpdateBanner info={update} progress={updatePct} onInstall={() => void installUpdate(update.version)} onDismiss={() => setUpdate(null)} />}
         <button className="rail-item" data-tip={hint("settings")} aria-current={railOf(view) === "settings" ? "page" : undefined} aria-label={t("nav.settings")} onClick={() => setView("settings")}>
           <Icon name="settings" />
           <span className="rail-label">{t("nav.settings")}</span>
@@ -987,7 +996,7 @@ export default function App() {
           </div>
         </>
       )}
-      <Activity state={activity} onDismiss={() => setActivity(null)} />
+      <Activity state={installing ? { kind: "progress", text: t("update.auto", { version: installing }), pct: updatePct != null && updatePct >= 0 ? updatePct : null } : activity} onDismiss={() => setActivity(null)} />
       {confirm && <Confirm state={confirm} onCancel={() => setConfirm(null)} />}
     </div>
   );

@@ -500,6 +500,8 @@
     }
   },
   "update": {
+    "portable": "The portable copy does not update itself. Download the new file, or run the installer once.",
+    "auto": "Installing update {{version}}. The app will restart.",
     "available": "Version {{version}} is available",
     "hint": "Currently {{current}}. The package signature is verified before installing.",
     "installing": "Downloading and verifying the signature. The app restarts by itself.",
