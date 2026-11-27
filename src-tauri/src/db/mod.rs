@@ -70,7 +70,7 @@ impl Db {
             }
         };
 
-        let settings = Settings {
+        let mut settings = Settings {
             installation_dir: pg_dir.join("bin"),
             data_dir: pg_dir.join("data"),
             password_file: pg_dir.join("pgpass"),
@@ -81,6 +81,9 @@ impl Db {
             timeout: Some(std::time::Duration::from_secs(120)), // initdb is slow on Windows with antivirus
             ..Settings::default()
         };
+        if let Some(version) = server_for_data(&pg_dir, &settings.version.to_string())? {
+            settings.version = format!("={version}").parse().map_err(|_| DbError::Embedded(format!("bad server version {version}")))?;
+        }
 
         // A server left behind by a run that was killed (crash, forced quit, update restart) keeps the data
         // folder locked: starting a second one then waits for its full timeout and fails. Use the live one
@@ -117,6 +120,30 @@ impl Db {
         self.pool.close().await;
         self.pg.stop().await.map_err(|e| DbError::Embedded(e.to_string()))
     }
+}
+
+/// A database opens only with a server of the major version that created it. When that is not the bundled one
+/// (0.2.4 shipped PostgreSQL 19, so fresh installs of it have a 19 database), this returns the version of the
+/// newest matching server already unpacked in `postgres/bin`. `None`: use the bundled server.
+fn server_for_data(pg_dir: &Path, bundled: &str) -> Result<Option<String>, DbError> {
+    // no PG_VERSION: there is no database yet
+    let Ok(data) = std::fs::read_to_string(pg_dir.join("data").join("PG_VERSION")) else { return Ok(None) };
+    let data = data.trim();
+    if bundled.trim_start_matches('=').split('.').next() == Some(data) {
+        return Ok(None);
+    }
+    std::fs::read_dir(pg_dir.join("bin"))
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let name = entry.file_name().into_string().ok()?;
+            let numbers: Vec<u64> = name.split('.').map(str::parse).collect::<Result<_, _>>().ok()?;
+            (numbers.len() == 3 && name.split('.').next() == Some(data) && entry.path().join("bin").is_dir()).then_some((numbers, name))
+        })
+        .max()
+        .map(|(_, name)| Some(name))
+        .ok_or_else(|| DbError::Embedded(format!("the database was made by PostgreSQL {data}, and the files of that server are missing")))
 }
 
 /// The port of a server still running on `data`, per its `postmaster.pid`. A pid file whose process is gone
@@ -158,6 +185,53 @@ fn rand_bytes() -> [u8; 16] {
     let mut out = [0u8; 16];
     out.copy_from_slice(&(n ^ (std::process::id() as u128) << 64).to_le_bytes());
     out
+}
+
+#[cfg(test)]
+mod server_version_tests {
+    use super::*;
+
+    fn pg_dir(data: Option<&str>, servers: &[&str]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        if let Some(v) = data {
+            std::fs::create_dir_all(dir.path().join("data")).unwrap();
+            std::fs::write(dir.path().join("data").join("PG_VERSION"), format!("{v}\n")).unwrap();
+        }
+        for s in servers {
+            std::fs::create_dir_all(dir.path().join("bin").join(s).join("bin")).unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn bundled_server_for_a_new_or_matching_database() {
+        assert_eq!(server_for_data(pg_dir(None, &["19.0.0"]).path(), "=18.7.0").unwrap(), None);
+        assert_eq!(server_for_data(pg_dir(Some("18"), &["18.7.0", "19.0.0"]).path(), "=18.7.0").unwrap(), None);
+    }
+
+    #[test]
+    fn newest_unpacked_server_of_the_database_major() {
+        let dir = pg_dir(Some("19"), &["18.7.0", "19.0.0", "19.2.0", "19.10.0"]);
+        assert_eq!(server_for_data(dir.path(), "=18.7.0").unwrap().as_deref(), Some("19.10.0"));
+    }
+
+    #[test]
+    fn says_which_server_is_missing() {
+        let error = server_for_data(pg_dir(Some("19"), &["18.7.0"]).path(), "=18.7.0").unwrap_err();
+        assert!(error.to_string().contains("PostgreSQL 19"));
+    }
+
+    /// Starts real servers. `KAE_PG_TEST_DIR` is an app folder prepared by hand: empty for a new database,
+    /// or holding a database of another version. Prints the version of the server that opened it.
+    #[tokio::test]
+    #[ignore]
+    async fn opens_the_database_in_test_dir() {
+        let dir = std::path::PathBuf::from(std::env::var("KAE_PG_TEST_DIR").unwrap());
+        let db = Db::start(&dir).await.unwrap();
+        let version: String = sqlx::query_scalar("SHOW server_version").fetch_one(&db.pool).await.unwrap();
+        println!("{}: server {version}", dir.display());
+        db.stop().await.unwrap();
+    }
 }
 
 #[cfg(test)]

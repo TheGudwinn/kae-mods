@@ -69,7 +69,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           file="Kae-Mods-${GITHUB_REF_NAME#v}-windows-x64-portable.exe"
-          cp src-tauri/target/release/deadlock-mm.exe "$file"
+          cp "src-tauri/target/release/Kae Mods.exe" "$file"
           gh release upload "${GITHUB_REF_NAME}" "$file" --repo "${GITHUB_REPOSITORY}" --clobber
 
       # Installed apps see the new version only from this moment, with every file already in place.

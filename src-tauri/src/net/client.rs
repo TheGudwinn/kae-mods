@@ -7,7 +7,7 @@ pub fn build_client(cfg: &NetConfig) -> Result<reqwest::Client, NetError> {
     let mut b = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(cfg.connect_timeout_secs))
         .read_timeout(Duration::from_secs(cfg.read_timeout_secs))
-        .user_agent(concat!("deadlock-mm/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("kae-mods/", env!("CARGO_PKG_VERSION")))
         .redirect(redirect_policy());
 
     match cfg.proxy.mode {
