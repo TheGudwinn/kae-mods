@@ -2,7 +2,7 @@ use super::error::InstallError;
 use super::extract::{detect_kind, extract_vpks, ArchiveKind, Limits};
 use super::gameinfo::{ensure_addons_path, write_atomic, PatchResult};
 use super::journal::{ensure_within, Journal, Op};
-use super::pak_order::{addon_name, disabled_name, slot_of};
+use super::pak_order::{addon_name, disabled_name, is_legacy, slot_of};
 use super::vpk::{read_vpk_index, VpkFile};
 use crate::library::scan::{find_duplicate, overlaps, scan_addons, Overlap};
 use crate::steam::locate::GameInstall;
@@ -287,7 +287,11 @@ pub fn plan_reorder(items: &[ReorderItem]) -> Result<Vec<(String, String)>, Inst
     }
     let mut slots: Vec<u8> = Vec::with_capacity(flat.len());
     for (_, f) in &flat {
-        slots.push(slot_of(f).ok_or_else(|| InstallError::Journal(format!("not one of our addon files: {f}")))?);
+        // ours are plain `pakNN_dir.vpk` names (or the first versions' ones); any other prefix is another manager's file
+        let slot = slot_of(f)
+            .filter(|slot| is_legacy(f) || **f == addon_name(0, *slot))
+            .ok_or_else(|| InstallError::Journal(format!("not one of our addon files: {f}")))?;
+        slots.push(slot);
     }
     slots.sort_unstable();
     slots.dedup();
