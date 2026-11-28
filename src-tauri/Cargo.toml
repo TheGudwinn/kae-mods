@@ -1,6 +1,6 @@
 [package]
 name = "deadlock-mm"
-version = "0.2.4"
+version = "0.2.5"
 description = "Kae Mods"
 license = "GPL-3.0-only"
 authors = ["you"]
